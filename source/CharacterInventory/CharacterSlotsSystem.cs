@@ -77,6 +77,7 @@ public class CharacterSlotsSystem : ModSystem
 
     public override double ExecuteOrder() => 0.01;
 
+
     public void RegisterSlot(string slotId, CreateCharacterSlotDelegate createSlotDelegate, SlotGuiConfig guiConfig)
     {
         if (_createSlotDelegates.ContainsKey(slotId))
@@ -103,6 +104,7 @@ public class CharacterSlotsSystem : ModSystem
         index = SlotIdToIndex[slotId];
         return _createSlotDelegates[slotId].Invoke(inventory, stack, playerUid, _api, index, slotId);
     }
+
 
     public override void StartPre(ICoreAPI api)
     {

@@ -1,4 +1,5 @@
-﻿using System.Collections.Immutable;
+﻿using PlayerInventoryLib.Utils;
+using System.Collections.Immutable;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
@@ -6,7 +7,7 @@ using Vintagestory.API.Server;
 namespace PlayerInventoryLib;
 
 
-public delegate ItemSlot CreateCharacterSlotDelegate(CharacterInventory inventory, ItemStack? stack, IPlayer player, ICoreAPI api, int index, string id);
+public delegate ItemSlot CreateCharacterSlotDelegate(CharacterInventory inventory, ItemStack? stack, string playerUid, ICoreAPI api, int index, string id);
 
 public class DuplicatedSlotIdException : Exception
 {
@@ -69,8 +70,10 @@ public class CharacterSlotsSystem : ModSystem
         "ArmorHead",
         "ArmorBody",
         "ArmorLegs"
-        ];
+    ];
     public HashSet<string> SlotsThatDropItemsOnDeath { get; } = [];
+
+    public event Action? OnReady;
 
     public override double ExecuteOrder() => 0.01;
 
@@ -85,7 +88,7 @@ public class CharacterSlotsSystem : ModSystem
         _guiConfigs.Add(slotId, guiConfig);
     }
 
-    public ItemSlot CreateSlot(string slotId, out int index, CharacterInventory inventory, ItemStack? stack, IPlayer player)
+    public ItemSlot CreateSlot(string slotId, out int index, CharacterInventory inventory, ItemStack? stack, string playerUid)
     {
         if (_api == null || !Ready)
         {
@@ -98,22 +101,24 @@ public class CharacterSlotsSystem : ModSystem
         }
 
         index = SlotIdToIndex[slotId];
-        return _createSlotDelegates[slotId].Invoke(inventory, stack, player, _api, index, slotId);
+        return _createSlotDelegates[slotId].Invoke(inventory, stack, playerUid, _api, index, slotId);
     }
 
     public override void StartPre(ICoreAPI api)
     {
+        _api = api;
         RegisterVanillaSlots();
     }
 
     public override void Start(ICoreAPI api)
     {
-        _api = api;
         ProcessSlots();
 
         if (api is ICoreServerAPI serverApi)
         {
             RegisterSlotTags(serverApi);
+            Ready = true;
+            OnReady?.Invoke();
         }
     }
 
@@ -123,14 +128,15 @@ public class CharacterSlotsSystem : ModSystem
         {
             AddTagsToCollectibles(serverApi);
         }
+        else
+        {
+            CollectSlotTags(api);
+            Ready = true;
+            OnReady?.Invoke();
+        }
     }
 
-    public ItemSlot CreateClothesSlot(CharacterInventory inventory, ItemStack? stack, IPlayer player, ICoreAPI api, int index, string id)
-    {
-        return new CharacterInventorySlot(SlotIdToTag[id], id, inventory);
-    }
-
-
+    
 
     private readonly Dictionary<string, CreateCharacterSlotDelegate> _createSlotDelegates = [];
     private readonly Dictionary<string, SlotGuiConfig> _guiConfigs = [];
@@ -149,7 +155,8 @@ public class CharacterSlotsSystem : ModSystem
             idToIndex[SlotIndexToId[slotIndex]] = slotIndex;
         }
         SlotIdToIndex = idToIndex.ToImmutableDictionary();
-        Ready = true;
+
+        LoggerUtil.Notify(_api, this, $"Registered character slots: {SlotIndexToId.Aggregate((a, b) => $"{a}, {b}")}");
     }
 
     private void RegisterSlotTags(ICoreServerAPI api)
@@ -157,9 +164,22 @@ public class CharacterSlotsSystem : ModSystem
         Dictionary<string, TagSet> tags = [];
         foreach (string slotId in SlotIndexToId)
         {
-            string tagName = $"slot-{slotId}";
-            TagSet tag = api.CollectibleTagRegistry.RegisterAndCreateTagSet(slotId);
-            tags.Add(tagName, tag);
+            string tagName = $"slot-{slotId.ToLowerInvariant()}";
+            api.CollectibleTagRegistry.Register(tagName);
+            TagSet tag = api.CollectibleTagRegistry.CreateTagSet(tagName);
+            tags.Add(slotId, tag);
+        }
+        SlotIdToTag = tags.ToImmutableDictionary();
+    }
+
+    private void CollectSlotTags(ICoreAPI api)
+    {
+        Dictionary<string, TagSet> tags = [];
+        foreach (string slotId in SlotIndexToId)
+        {
+            string tagName = $"slot-{slotId.ToLowerInvariant()}";
+            TagSet tag = api.CollectibleTagRegistry.CreateTagSet(tagName);
+            tags.Add(slotId, tag);
         }
         SlotIdToTag = tags.ToImmutableDictionary();
     }
@@ -169,22 +189,19 @@ public class CharacterSlotsSystem : ModSystem
         List<CollectibleObject> collectibles = api.World.Collectibles;
         foreach (CollectibleObject collectible in collectibles)
         {
-            string? clothesCategory = collectible.Attributes["clothescategory"].AsString() ?? collectible.Attributes["attachableToEntity"]["categoryCode"].AsString();
+            string? clothesCategory = collectible.Attributes?["clothescategory"]?.AsString() ?? collectible.Attributes?["attachableToEntity"]?["categoryCode"]?.AsString();
             if (clothesCategory == null)
             {
                 continue;
             }
 
-            foreach (string slotId in SlotIndexToId)
+            foreach (string slotId in SlotIndexToId.Where(slotId => slotId.Equals(clothesCategory, StringComparison.InvariantCultureIgnoreCase)))
             {
-                if (slotId.Equals(clothesCategory, StringComparison.InvariantCultureIgnoreCase))
-                {
-                    TagSet slotTag = SlotIdToTag[slotId];
-                    // WTF IS THIS MESS!? where are my set opreations in TagSet!?
-                    IEnumerable<string> collectibleTags = api.CollectibleTagRegistry.SlowEnumerateTagNames(collectible.Tags);
-                    IEnumerable<string> slotTags = api.CollectibleTagRegistry.SlowEnumerateTagNames(slotTag);
-                    collectible.Tags = api.CollectibleTagRegistry.CreateTagSet(collectibleTags.Concat(slotTags));
-                }
+                TagSet slotTag = SlotIdToTag[slotId];
+                // WTF IS THIS MESS!? Where are my set opreations in TagSet!?
+                IEnumerable<string> collectibleTags = api.CollectibleTagRegistry.SlowEnumerateTagNames(collectible.Tags);
+                IEnumerable<string> slotTags = api.CollectibleTagRegistry.SlowEnumerateTagNames(slotTag);
+                collectible.Tags = api.CollectibleTagRegistry.CreateTagSet(collectibleTags.Concat(slotTags));
             }
         }
     }
@@ -195,5 +212,10 @@ public class CharacterSlotsSystem : ModSystem
         {
             RegisterSlot(id, CreateClothesSlot, new());
         }
+    }
+
+    private ItemSlot CreateClothesSlot(CharacterInventory inventory, ItemStack? stack, string playerUid, ICoreAPI api, int index, string id)
+    {
+        return new CharacterInventorySlot(SlotIdToTag[id], id, inventory);
     }
 }

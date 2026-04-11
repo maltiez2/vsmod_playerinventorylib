@@ -32,15 +32,16 @@ public class CharacterInventorySlot : ItemSlotCharacter, IClickableSlot
 
     public string SlotId { get; set; }
     public TagSet SlotIdTag { get; set; }
+    public TagSet ExcludeTags { get; set; }
 
-    public override EnumItemStorageFlags StorageType => EnumItemStorageFlags.General;
+    public override EnumItemStorageFlags StorageType => EnumItemStorageFlags.General | EnumItemStorageFlags.Agriculture | EnumItemStorageFlags.Alchemy | EnumItemStorageFlags.Jewellery | EnumItemStorageFlags.Metallurgy | EnumItemStorageFlags.Outfit;
 
     public event IClickableSlot.SlotClickedDelegate? OnSlotClicked;
 
 
     public virtual bool FitsSlot(ItemStack stack)
     {
-        return stack.Collectible.Tags.Overlaps(SlotIdTag);
+        return stack.Collectible.Tags.Overlaps(SlotIdTag) && !stack.Collectible.Tags.Overlaps(ExcludeTags);
     }
 
     public override void ActivateSlot(ItemSlot sourceSlot, ref ItemStackMoveOperation op)

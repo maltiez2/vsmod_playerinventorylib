@@ -1,5 +1,7 @@
 ﻿using System.Collections.Immutable;
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
+using Vintagestory.API.Server;
 
 namespace PlayerInventoryLib;
 
@@ -50,6 +52,7 @@ public class CharacterSlotsSystem : ModSystem
     public bool Ready { get; private set; }
     public ImmutableDictionary<string, int> SlotIdToIndex { get; private set; } = ImmutableDictionary.Create<string, int>();
     public ImmutableList<string> SlotIndexToId { get; private set; } = [];
+    public ImmutableDictionary<string, TagSet> SlotIdToTag { get; private set; } = ImmutableDictionary.Create<string, TagSet>();
     public List<string> DefaultVanillaSlotsOrder { get; } = [
         "Head",
         "Shoulder",
@@ -67,6 +70,7 @@ public class CharacterSlotsSystem : ModSystem
         "ArmorBody",
         "ArmorLegs"
         ];
+    public HashSet<string> SlotsThatDropItemsOnDeath { get; } = [];
 
     public override double ExecuteOrder() => 0.01;
 
@@ -106,25 +110,38 @@ public class CharacterSlotsSystem : ModSystem
     {
         _api = api;
         ProcessSlots();
+
+        if (api is ICoreServerAPI serverApi)
+        {
+            RegisterSlotTags(serverApi);
+        }
     }
 
-    public static ItemSlot CreateClothesSlot(CharacterInventory inventory, ItemStack? stack, IPlayer player, ICoreAPI api, int index, string id)
+    public override void AssetsFinalize(ICoreAPI api)
     {
-        return new ClothesSlot(Enum.Parse<EnumCharacterDressType>(id), inventory);
+        if (api is ICoreServerAPI serverApi)
+        {
+            AddTagsToCollectibles(serverApi);
+        }
+    }
+
+    public ItemSlot CreateClothesSlot(CharacterInventory inventory, ItemStack? stack, IPlayer player, ICoreAPI api, int index, string id)
+    {
+        return new CharacterInventorySlot(SlotIdToTag[id], id, inventory);
     }
 
 
 
-    private Dictionary<string, CreateCharacterSlotDelegate> _createSlotDelegates = [];
-    private Dictionary<string, SlotGuiConfig> _guiConfigs = [];
+    private readonly Dictionary<string, CreateCharacterSlotDelegate> _createSlotDelegates = [];
+    private readonly Dictionary<string, SlotGuiConfig> _guiConfigs = [];
     private ICoreAPI? _api;
 
     private void ProcessSlots()
     {
-        SlotIndexToId = _createSlotDelegates
-            .Keys
-            .Order()
-            .ToImmutableList();
+        IOrderedEnumerable<string> moddedSlotsOrder = _createSlotDelegates.Keys.Except(DefaultVanillaSlotsOrder).Order();
+        IEnumerable<string> slotsOrder = DefaultVanillaSlotsOrder.Concat(moddedSlotsOrder);
+
+        SlotIndexToId = slotsOrder.ToImmutableList();
 
         Dictionary<string, int> idToIndex = [];
         for (int slotIndex = 0; slotIndex < SlotIndexToId.Count; slotIndex++)
@@ -133,6 +150,43 @@ public class CharacterSlotsSystem : ModSystem
         }
         SlotIdToIndex = idToIndex.ToImmutableDictionary();
         Ready = true;
+    }
+
+    private void RegisterSlotTags(ICoreServerAPI api)
+    {
+        Dictionary<string, TagSet> tags = [];
+        foreach (string slotId in SlotIndexToId)
+        {
+            string tagName = $"slot-{slotId}";
+            TagSet tag = api.CollectibleTagRegistry.RegisterAndCreateTagSet(slotId);
+            tags.Add(tagName, tag);
+        }
+        SlotIdToTag = tags.ToImmutableDictionary();
+    }
+
+    private void AddTagsToCollectibles(ICoreServerAPI api)
+    {
+        List<CollectibleObject> collectibles = api.World.Collectibles;
+        foreach (CollectibleObject collectible in collectibles)
+        {
+            string? clothesCategory = collectible.Attributes["clothescategory"].AsString() ?? collectible.Attributes["attachableToEntity"]["categoryCode"].AsString();
+            if (clothesCategory == null)
+            {
+                continue;
+            }
+
+            foreach (string slotId in SlotIndexToId)
+            {
+                if (slotId.Equals(clothesCategory, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    TagSet slotTag = SlotIdToTag[slotId];
+                    // WTF IS THIS MESS!? where are my set opreations in TagSet!?
+                    IEnumerable<string> collectibleTags = api.CollectibleTagRegistry.SlowEnumerateTagNames(collectible.Tags);
+                    IEnumerable<string> slotTags = api.CollectibleTagRegistry.SlowEnumerateTagNames(slotTag);
+                    collectible.Tags = api.CollectibleTagRegistry.CreateTagSet(collectibleTags.Concat(slotTags));
+                }
+            }
+        }
     }
 
     private void RegisterVanillaSlots()

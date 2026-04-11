@@ -7,12 +7,7 @@ using Vintagestory.Common;
 
 namespace PlayerInventoryLib.Armor;
 
-public interface IClickableSlot
-{
-    delegate bool SlotClickedDelegate(ItemSlot thisSlot, ItemSlot sourceSlot, ref ItemStackMoveOperation operation);
 
-    SlotClickedDelegate OnSlotClicked { set; get; }
-}
 
 public class ClothesSlot : ItemSlotCharacter, IClickableSlot
 {

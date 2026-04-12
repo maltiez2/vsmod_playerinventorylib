@@ -24,11 +24,7 @@ public static class GuiDialogPatches
 
     public static void Unpatch(string harmonyId)
     {
-        new Harmony(harmonyId).Unpatch(typeof(GuiDialogCharacter).GetMethod("ComposeCharacterTab", AccessTools.all), HarmonyPatchType.Prefix, harmonyId);
-        new Harmony(harmonyId).Unpatch(typeof(GuiDialogCharacter).GetMethod("OnRenderGUI", AccessTools.all), HarmonyPatchType.Postfix, harmonyId);
-        new Harmony(harmonyId).Unpatch(typeof(GuiDialogInventory).GetMethod("ComposeSurvivalInvDialog", AccessTools.all), HarmonyPatchType.Prefix, harmonyId);
-        new Harmony(harmonyId).Unpatch(typeof(GuiDialogInventory).GetMethod("OnNewScrollbarvalue", AccessTools.all), HarmonyPatchType.Prefix, harmonyId);
-        new Harmony(harmonyId).Unpatch(typeof(CharacterSystem).GetMethod("StartClientSide", AccessTools.all), HarmonyPatchType.Postfix, harmonyId);
+        //new Harmony(harmonyId).Unpatch(typeof(GuiDialogCharacter).GetMethod("ComposeCharacterTab", AccessTools.all), HarmonyPatchType.Prefix, harmonyId);
 
         Api = null;
     }

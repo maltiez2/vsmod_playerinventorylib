@@ -236,23 +236,28 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         double dialogPadding = 4;
         int totalHeight = 400;
 
-        int outerColumnSlotsNumber = 6;
+        int outerColumnSlotsNumber = 9;
         int clothesColumnSlotsNumber = 6;
         int slotsInRowNumber = 6;
-        int slotsRowsNumber = 1;
+        int slotsRowsNumber = 6;
+        int groupsNumber = 3;
 
         CairoFont groupFont = CairoFont.WhiteSmallText();
 
+        // Outer columns
         ElementBounds leftSlotsColumnBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, internalPadding, verticalPadding, 1, outerColumnSlotsNumber).FixedGrow(0, padding);
         ElementBounds rightSlotsColumnBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, 0, verticalPadding, 1, outerColumnSlotsNumber).FixedGrow(0, padding);
-        ElementBounds leftClothesSlotsBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, 0, 0, 1, clothesColumnSlotsNumber).FixedGrow(0, padding);
-        ElementBounds rightClothesSlotsBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, 0, 0, 1, clothesColumnSlotsNumber).FixedGrow(0, padding);
-        ElementBounds topMiddleSectionBounds = ElementBounds.Fixed(0, verticalPadding, padding + (padding + slotSize) * slotsInRowNumber, padding + (padding + slotSize) * clothesColumnSlotsNumber);
+        // Clothes
+        ElementBounds leftClothesSlotsBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, 2, 3, 1, clothesColumnSlotsNumber).FixedGrow(0, padding);
+        ElementBounds rightClothesSlotsBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, -2, 3, 1, clothesColumnSlotsNumber).FixedGrow(0, padding);
+        ElementBounds topMiddleSectionBounds = ElementBounds.Fixed(0, verticalPadding, padding + (padding + slotSize) * slotsInRowNumber + 2, padding + (padding + slotSize) * clothesColumnSlotsNumber);
+        // Groups
         ElementBounds middleGroupSlotsBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, bottomMiddleSectionInternalPadding, bottomMiddleSectionInternalPadding, slotsInRowNumber, 1).FixedGrow(0, padding);
         ElementBounds middleGroupTextBounds = ElementBounds.Fixed(bottomMiddleSectionInternalPadding, 2, middleGroupSlotsBounds.fixedWidth - bottomMiddleSectionInternalPadding, textHeight);
-        ElementBounds middleGroupInsetBounds = ElementBounds.Fixed(0, 0, middleGroupSlotsBounds.fixedWidth + bottomMiddleSectionInternalPadding, middleGroupTextBounds.fixedHeight + middleGroupSlotsBounds.fixedHeight + bottomMiddleSectionInternalPadding).FixedGrow(0, padding);
+        ElementBounds middleGroupInsetBounds = ElementBounds.Fixed(0, 0, middleGroupSlotsBounds.fixedWidth + bottomMiddleSectionInternalPadding + 3, middleGroupTextBounds.fixedHeight + middleGroupSlotsBounds.fixedHeight + bottomMiddleSectionInternalPadding).FixedGrow(0, padding);
         ElementBounds bottomMiddleSectionBounds = ElementBounds.Fixed(0, 0, middleGroupSlotsBounds.fixedWidth + bottomMiddleSectionInternalPadding * 2, bottomMiddleSectionInternalPadding + (middleGroupInsetBounds.fixedHeight + bottomMiddleSectionInternalPadding) * slotsRowsNumber);
-        insetSlotBounds = ElementBounds.Fixed(0, 0, topMiddleSectionBounds.fixedWidth - leftClothesSlotsBounds.fixedWidth - rightClothesSlotsBounds.fixedWidth - 2 * internalPadding, padding + (padding + slotSize) * clothesColumnSlotsNumber);
+        // Player shape inset
+        insetSlotBounds = ElementBounds.Fixed(-2, 0, topMiddleSectionBounds.fixedWidth - leftClothesSlotsBounds.fixedWidth - rightClothesSlotsBounds.fixedWidth - 2 * internalPadding - 2, padding + (padding + slotSize) * clothesColumnSlotsNumber);
 
         CharacterTabScrollAreaBounds = ElementBounds.Fixed(2, verticalPadding + dialogPadding + 6, leftSlotsColumnBounds.fixedWidth + rightSlotsColumnBounds.fixedWidth + topMiddleSectionBounds.fixedWidth + internalPadding * 4, totalHeight);
         ElementBounds scrollbarBounds = CharacterTabScrollAreaBounds.CopyOffsetedSibling(CharacterTabScrollAreaBounds.fixedWidth, 0, 0, 0).WithFixedWidth(20);
@@ -266,9 +271,9 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         topMiddleSectionBounds.WithParent(CharacterTabScrollAreaBounds);
         bottomMiddleSectionBounds.WithParent(CharacterTabScrollAreaBounds);
 
-        middleGroupInsetBounds.WithParent(bottomMiddleSectionBounds);
+        /*middleGroupInsetBounds.WithParent(bottomMiddleSectionBounds);
         middleGroupSlotsBounds.WithParent(middleGroupInsetBounds);
-        middleGroupTextBounds.WithParent(middleGroupInsetBounds);
+        middleGroupTextBounds.WithParent(middleGroupInsetBounds);*/
         rightClothesSlotsBounds.WithParent(topMiddleSectionBounds);
         leftClothesSlotsBounds.WithParent(topMiddleSectionBounds);
         insetSlotBounds.WithParent(topMiddleSectionBounds);
@@ -279,22 +284,55 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         rightClothesSlotsBounds.FixedRightOf(insetSlotBounds, internalPadding);
         rightSlotsColumnBounds.FixedRightOf(topMiddleSectionBounds, internalPadding);
         bottomMiddleSectionBounds.FixedRightOf(leftSlotsColumnBounds, internalPadding).FixedUnder(topMiddleSectionBounds, internalPadding);
-        middleGroupSlotsBounds.FixedUnder(middleGroupTextBounds, bottomMiddleSectionInternalPadding * 2);
+        //middleGroupSlotsBounds.FixedUnder(middleGroupTextBounds, bottomMiddleSectionInternalPadding * 2);
 
         compo.BeginClip(CharacterTabClipBounds);
         compo.BeginChildElements(CharacterTabScrollAreaBounds);
 
-        compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, [0, 1, 2, 11, 3, 4], leftSlotsColumnBounds, "leftSlots_");
+        compo.AddScrollableInset(bottomMiddleSectionBounds, 0, 1);
+        compo.AddScrollableInset(topMiddleSectionBounds, 3, 0.8f);
+        compo.AddScrollableInset(insetSlotBounds, 0, 1.0f);
+
+        compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, [0, 1, 2, 11, 3, 4, 10, 5, 9], leftSlotsColumnBounds, "leftSlots_");
         compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, [0, 1, 2, 11, 3, 4], leftClothesSlotsBounds, "leftSlots");
         compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, [6, 7, 8, 10, 5, 9], rightClothesSlotsBounds, "rightSlots");
-        compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, [6, 7, 8, 10, 5, 9], rightSlotsColumnBounds, "rightSlots_");
-        compo.AddItemSlotGrid(characterInv, SendInvPacket, slotsInRowNumber, [6, 7, 8, 10, 5, 9], middleGroupSlotsBounds, "middleSlots");
-        compo.AddRichtext("Backpack", groupFont, middleGroupTextBounds, "groupText");
-        compo.AddScrollableInset(insetSlotBounds, 0, 0.8f);
-        compo.AddScrollableInset(middleGroupInsetBounds, 3, 0.8f);
-        compo.AddScrollableInset(bottomMiddleSectionBounds, 0, 1);
-        compo.AddScrollableInset(topMiddleSectionBounds, 0, 1);
-        //compo.AddInset(CharacterTabClipBounds, 4, 0.8f);
+        compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, [6, 7, 8, 10, 5, 9, 0, 1, 2], rightSlotsColumnBounds, "rightSlots_");
+        
+
+        ElementBounds? lastGroupBouds = null;
+        for (int groupIndex = 0; groupIndex < groupsNumber; groupIndex++)
+        {
+            int slotsInGroup = 6 + groupIndex * 3;
+            int rows = (int)Math.Ceiling((float)slotsInGroup / slotsInRowNumber);
+
+            ElementBounds slotsBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, bottomMiddleSectionInternalPadding, bottomMiddleSectionInternalPadding, slotsInRowNumber, rows).FixedGrow(0, padding);
+            ElementBounds textBounds = ElementBounds.Fixed(bottomMiddleSectionInternalPadding, 2, slotsBounds.fixedWidth - bottomMiddleSectionInternalPadding, textHeight);
+            ElementBounds insetBounds = ElementBounds.Fixed(0, 0, slotsBounds.fixedWidth + bottomMiddleSectionInternalPadding + 3, textBounds.fixedHeight + slotsBounds.fixedHeight + bottomMiddleSectionInternalPadding).FixedGrow(0, padding);
+
+            insetBounds.WithParent(bottomMiddleSectionBounds);
+            textBounds.WithParent(insetBounds);
+            slotsBounds.WithParent(insetBounds);
+            slotsBounds.FixedUnder(textBounds, bottomMiddleSectionInternalPadding * 2);
+
+            if (lastGroupBouds != null)
+            {
+                insetBounds.FixedUnder(lastGroupBouds, internalPadding);
+            }
+            lastGroupBouds = insetBounds;
+
+            int[] slots = groupIndex switch
+            {
+                0 => [6, 7, 8, 10, 5, 9],
+                1 => [6, 7, 8, 10, 5, 9, 0, 1, 2],
+                2 => [6, 7, 8, 10, 5, 9, 0, 1, 2, 11, 3, 4],
+                _ => [6, 7, 8, 10, 5, 9, 0, 1, 2, 11, 3, 4]
+            };
+
+            compo.AddScrollableInset(insetBounds, 3, 0.8f);
+            compo.AddItemSlotGrid(characterInv, SendInvPacket, slotsInRowNumber, slots, slotsBounds, $"middleSlots-{groupIndex}");
+            compo.AddRichtext("Backpack", groupFont, textBounds, $"groupText-{groupIndex}");
+        }
+
 
         compo.EndChildElements();
         compo.EndClip();
@@ -352,7 +390,7 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
 
             ElementBounds tabBounds = ElementBounds.Fixed(5, -24, 350, 25);
 
-        
+
             ClearComposers();
             Composers["playercharacter"] = capi.Gui
                 .CreateCompo("playercharacter", DialogBounds)

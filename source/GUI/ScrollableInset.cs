@@ -12,6 +12,8 @@ public class GuiElementScrollableInset : GuiElement
         Brightness = brightness;
     }
 
+    public override bool Focusable => false;
+
 
     public override void ComposeElements(Context ctxStatic, ImageSurface surface)
     {
@@ -28,6 +30,27 @@ public class GuiElementScrollableInset : GuiElement
                 Bounds
             );
         }
+    }
+
+    public override void OnMouseDownOnElement(ICoreClientAPI api, MouseEvent args)
+    {
+        // ignore, to let other elements work as intened
+    }
+
+    public override void OnMouseUpOnElement(ICoreClientAPI api, MouseEvent args)
+    {
+        // ignore, to let other elements work as intened
+    }
+
+    public override void OnMouseMove(ICoreClientAPI api, MouseEvent args)
+    {
+        // ignore, to let other elements work as intened
+    }
+
+    public override bool IsPositionInside(int posX, int posY)
+    {
+        // ignore, to let other elements work as intened
+        return false;
     }
 
     public override void Dispose()

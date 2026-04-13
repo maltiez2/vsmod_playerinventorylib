@@ -16,6 +16,7 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         clientApi = capi;
         rendertabhandlers.Clear();
         rendertabhandlers.Add(ComposeCharacterTab);
+        SlotsSystem = capi.ModLoader.GetModSystem<CharacterSlotsSystem>() ?? throw new Exception("CharacterSlotsSystem not found");
     }
 
 
@@ -34,6 +35,8 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
     public bool RotatePlayerShape { get => rotateCharacter; set => rotateCharacter = value; }
     public ICoreClientAPI Api { get => clientApi; set => clientApi = value; }
     public int CurrentTab { get => curTab; set => curTab = value; }
+    public CharacterInventorySlotsState CharacterTabSlotsState { get; } = new();
+    public CharacterSlotsSystem SlotsSystem { get; }
 
 
     public override void OnMouseDown(MouseEvent args)
@@ -218,11 +221,11 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         double dialogPadding = 4;
         int totalHeight = 400;
 
-        int outerColumnSlotsNumber = 9;
+        int outerColumnSlotsNumber = Math.Max(CharacterTabSlotsState.RightSlots.Count, CharacterTabSlotsState.LeftSlots.Count);
         int clothesColumnSlotsNumber = 6;
         int slotsInRowNumber = 6;
         int slotsRowsNumber = 6;
-        int groupsNumber = 3;
+        int groupsNumber = CharacterTabSlotsState.Groups.Count;
 
         CairoFont groupFont = CairoFont.WhiteSmallText();
 
@@ -271,17 +274,19 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         compo.AddScrollableInset(topMiddleSectionBounds, 3, 0.8f);
         compo.AddScrollableInset(insetSlotBounds, 0, 1.0f);
 
-        compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, [0, 1, 2, 11, 3, 4, 10, 5, 9], leftSlotsColumnBounds, "leftSlots_");
+        compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, CharacterTabSlotsState.LeftSlots.ToArray(), leftSlotsColumnBounds, "leftLeftSlots");
         compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, [0, 1, 2, 11, 3, 4], leftClothesSlotsBounds, "leftSlots");
         compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, [6, 7, 8, 10, 5, 9], rightClothesSlotsBounds, "rightSlots");
-        compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, [6, 7, 8, 10, 5, 9, 0, 1, 2], rightSlotsColumnBounds, "rightSlots_");
+        compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, CharacterTabSlotsState.RightSlots.ToArray(), rightSlotsColumnBounds, "rightRightSlots");
         
 
         ElementBounds? lastGroupBouds = null;
-        for (int groupIndex = 0; groupIndex < groupsNumber; groupIndex++)
+        foreach ((string groupCode, List<int> slotIndexes) in CharacterTabSlotsState.Groups)
         {
-            int slotsInGroup = 6 + groupIndex * 3;
+            int slotsInGroup = slotIndexes.Count;
             int rows = (int)Math.Ceiling((float)slotsInGroup / slotsInRowNumber);
+
+            string groupText = Lang.Get(SlotsSystem.GroupIdToGuiConfig[groupCode].Text);
 
             ElementBounds slotsBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, bottomMiddleSectionInternalPadding, bottomMiddleSectionInternalPadding, slotsInRowNumber, rows).FixedGrow(0, padding);
             ElementBounds textBounds = ElementBounds.Fixed(bottomMiddleSectionInternalPadding, 2, slotsBounds.fixedWidth - bottomMiddleSectionInternalPadding, textHeight);
@@ -298,17 +303,9 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
             }
             lastGroupBouds = insetBounds;
 
-            int[] slots = groupIndex switch
-            {
-                0 => [6, 7, 8, 10, 5, 9],
-                1 => [6, 7, 8, 10, 5, 9, 0, 1, 2],
-                2 => [6, 7, 8, 10, 5, 9, 0, 1, 2, 11, 3, 4],
-                _ => [6, 7, 8, 10, 5, 9, 0, 1, 2, 11, 3, 4]
-            };
-
             compo.AddScrollableInset(insetBounds, 3, 0.8f);
-            compo.AddItemSlotGrid(characterInv, SendInvPacket, slotsInRowNumber, slots, slotsBounds, $"middleSlots-{groupIndex}");
-            compo.AddRichtext("Backpack", groupFont, textBounds, $"groupText-{groupIndex}");
+            compo.AddItemSlotGrid(characterInv, SendInvPacket, slotsInRowNumber, slotIndexes.ToArray(), slotsBounds, $"middleSlots-{groupCode}");
+            compo.AddRichtext(groupText, groupFont, textBounds, $"groupText-{groupCode}");
         }
 
 

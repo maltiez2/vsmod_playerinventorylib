@@ -12,7 +12,7 @@ public delegate ItemSlot CreateCharacterSlotDelegate(CharacterInventory inventor
 public interface IEnableSlots
 {
     string[] GetSlotsToEnable();
-    Dictionary<string, SlotConfig> GetConfigOverrides();
+    Dictionary<string, CharacterSlotConfig> GetConfigOverrides();
 }
 
 public class DuplicatedSlotIdException : Exception
@@ -51,18 +51,23 @@ public class UnknownSlotIdException : Exception
 
 public class SlotConfig
 {
+    public ComplexTagCondition<TagSet>? Tags { get; set; }
     public string? Icon { get; set; }
+    public string? Color { get; set; }
+}
+
+public class CharacterSlotConfig : SlotConfig
+{
     public bool Disabled { get; set; } = false;
     public bool HiddenWhenDisabled { get; set; } = true;
     public string? Group { get; set; }
-    public string? Color { get; set; }
     public string? DisabledColor { get; set; }
 }
 
-public class SlotGroupGuiConfig
+public class CharacterSlotGroupGuiConfig
 {
-    public string? Text { get; set; }
-    public bool HideWhenNoSlots { get; set; } = true;
+    public string Text { get; set; } = "";
+    public bool HideWhenNoSlotsShown { get; set; } = true;
 }
 
 public class CharacterSlotsSystem : ModSystem
@@ -71,8 +76,8 @@ public class CharacterSlotsSystem : ModSystem
     public ImmutableDictionary<string, int> SlotIdToIndex { get; private set; } = ImmutableDictionary.Create<string, int>();
     public ImmutableList<string> SlotIndexToId { get; private set; } = [];
     public ImmutableDictionary<string, TagSet> SlotIdToTag { get; private set; } = ImmutableDictionary.Create<string, TagSet>();
-    public ImmutableDictionary<string, SlotConfig> SlotIdToConfig { get; private set; } = ImmutableDictionary.Create<string, SlotConfig>();
-    public ImmutableDictionary<string, SlotGroupGuiConfig> GroupIdToGuiConfig { get; private set; } = ImmutableDictionary.Create<string, SlotGroupGuiConfig>();
+    public ImmutableDictionary<string, CharacterSlotConfig> SlotIdToConfig { get; private set; } = ImmutableDictionary.Create<string, CharacterSlotConfig>();
+    public ImmutableDictionary<string, CharacterSlotGroupGuiConfig> GroupIdToGuiConfig { get; private set; } = ImmutableDictionary.Create<string, CharacterSlotGroupGuiConfig>();
     public List<string> DefaultVanillaSlotsOrder { get; } = [
         "Head",
         "Shoulder",
@@ -97,12 +102,12 @@ public class CharacterSlotsSystem : ModSystem
     public override double ExecuteOrder() => 0.01;
 
 
-    public void RegisterSlotGroup(string groupId, SlotGroupGuiConfig config)
+    public void RegisterSlotGroup(string groupId, CharacterSlotGroupGuiConfig config)
     {
 
     }
 
-    public void RegisterSlot(string slotId, CreateCharacterSlotDelegate createSlotDelegate, SlotConfig guiConfig)
+    public void RegisterSlot(string slotId, CreateCharacterSlotDelegate createSlotDelegate, CharacterSlotConfig config)
     {
         if (_createSlotDelegates.ContainsKey(slotId))
         {
@@ -110,7 +115,7 @@ public class CharacterSlotsSystem : ModSystem
         }
 
         _createSlotDelegates.Add(slotId, createSlotDelegate);
-        _guiConfigs.Add(slotId, guiConfig);
+        _configs.Add(slotId, config);
     }
 
     public ItemSlot CreateSlot(string slotId, out int index, CharacterInventory inventory, ItemStack? stack, string playerUid)
@@ -165,7 +170,8 @@ public class CharacterSlotsSystem : ModSystem
     
 
     private readonly Dictionary<string, CreateCharacterSlotDelegate> _createSlotDelegates = [];
-    private readonly Dictionary<string, SlotConfig> _guiConfigs = [];
+    private readonly Dictionary<string, CharacterSlotConfig> _configs = [];
+    private readonly Dictionary<string, CharacterSlotGroupGuiConfig> _groupConfigs = [];
     private ICoreAPI? _api;
 
     private void ProcessSlots()
@@ -181,6 +187,7 @@ public class CharacterSlotsSystem : ModSystem
             idToIndex[SlotIndexToId[slotIndex]] = slotIndex;
         }
         SlotIdToIndex = idToIndex.ToImmutableDictionary();
+        SlotIdToConfig = _configs.ToImmutableDictionary();
 
         LoggerUtil.Notify(_api, this, $"Registered character slots: {SlotIndexToId.Aggregate((a, b) => $"{a}, {b}")}");
     }
@@ -242,6 +249,11 @@ public class CharacterSlotsSystem : ModSystem
 
     private ItemSlot CreateClothesSlot(CharacterInventory inventory, ItemStack? stack, string playerUid, ICoreAPI api, int index, string id)
     {
-        return new CharacterInventorySlot(SlotIdToTag[id], id, inventory);
+        return new CharacterInventorySlot(SlotIdToTag[id], id, inventory, _configs[id], Enum.Parse<EnumCharacterDressType>(id));
+    }
+
+    private ItemSlot CreatePlayerInventorySlot(CharacterInventory inventory, ItemStack? stack, string playerUid, ICoreAPI api, int index, string id)
+    {
+        return new PlayerInventorySlot(SlotIdToTag[id], id, inventory, _configs[id]);
     }
 }

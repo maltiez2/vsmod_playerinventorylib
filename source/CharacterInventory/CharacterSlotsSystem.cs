@@ -9,6 +9,12 @@ namespace PlayerInventoryLib;
 
 public delegate ItemSlot CreateCharacterSlotDelegate(CharacterInventory inventory, ItemStack? stack, string playerUid, ICoreAPI api, int index, string id);
 
+public interface IEnableSlots
+{
+    string[] GetSlotsToEnable();
+    Dictionary<string, SlotConfig> GetConfigOverrides();
+}
+
 public class DuplicatedSlotIdException : Exception
 {
     public DuplicatedSlotIdException()
@@ -43,9 +49,20 @@ public class UnknownSlotIdException : Exception
     }
 }
 
-public class SlotGuiConfig
+public class SlotConfig
 {
+    public string? Icon { get; set; }
+    public bool Disabled { get; set; } = false;
+    public bool HiddenWhenDisabled { get; set; } = true;
+    public string? Group { get; set; }
+    public string? Color { get; set; }
+    public string? DisabledColor { get; set; }
+}
 
+public class SlotGroupGuiConfig
+{
+    public string? Text { get; set; }
+    public bool HideWhenNoSlots { get; set; } = true;
 }
 
 public class CharacterSlotsSystem : ModSystem
@@ -54,6 +71,8 @@ public class CharacterSlotsSystem : ModSystem
     public ImmutableDictionary<string, int> SlotIdToIndex { get; private set; } = ImmutableDictionary.Create<string, int>();
     public ImmutableList<string> SlotIndexToId { get; private set; } = [];
     public ImmutableDictionary<string, TagSet> SlotIdToTag { get; private set; } = ImmutableDictionary.Create<string, TagSet>();
+    public ImmutableDictionary<string, SlotConfig> SlotIdToConfig { get; private set; } = ImmutableDictionary.Create<string, SlotConfig>();
+    public ImmutableDictionary<string, SlotGroupGuiConfig> GroupIdToGuiConfig { get; private set; } = ImmutableDictionary.Create<string, SlotGroupGuiConfig>();
     public List<string> DefaultVanillaSlotsOrder { get; } = [
         "Head",
         "Shoulder",
@@ -78,7 +97,12 @@ public class CharacterSlotsSystem : ModSystem
     public override double ExecuteOrder() => 0.01;
 
 
-    public void RegisterSlot(string slotId, CreateCharacterSlotDelegate createSlotDelegate, SlotGuiConfig guiConfig)
+    public void RegisterSlotGroup(string groupId, SlotGroupGuiConfig config)
+    {
+
+    }
+
+    public void RegisterSlot(string slotId, CreateCharacterSlotDelegate createSlotDelegate, SlotConfig guiConfig)
     {
         if (_createSlotDelegates.ContainsKey(slotId))
         {
@@ -141,7 +165,7 @@ public class CharacterSlotsSystem : ModSystem
     
 
     private readonly Dictionary<string, CreateCharacterSlotDelegate> _createSlotDelegates = [];
-    private readonly Dictionary<string, SlotGuiConfig> _guiConfigs = [];
+    private readonly Dictionary<string, SlotConfig> _guiConfigs = [];
     private ICoreAPI? _api;
 
     private void ProcessSlots()

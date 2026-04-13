@@ -1,4 +1,5 @@
-﻿using Vintagestory.API.Common;
+﻿using Vintagestory.API.Client;
+using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.Client.NoObf;
 using Vintagestory.Server;
@@ -11,6 +12,8 @@ public sealed class PlayerInventoryLibSystem : ModSystem
     {
         HarmonyPatchesManager.Patch(api);
 
+        _clientApi = api as ICoreClientAPI;
+
         (api as ServerCoreAPI)?.ClassRegistryNative.RegisterInventoryClass(GlobalConstants.characterInvClassName, typeof(CharacterInventory));
         (api as ClientCoreAPI)?.ClassRegistryNative.RegisterInventoryClass(GlobalConstants.characterInvClassName, typeof(CharacterInventory));
     }
@@ -19,4 +22,16 @@ public sealed class PlayerInventoryLibSystem : ModSystem
     {
         HarmonyPatchesManager.Unpatch();
     }
+
+    public void RegisterSlotIcon(AssetLocation path)
+    {
+        if (_clientApi == null)
+        {
+            return;
+        }
+        _clientApi.Gui.Icons.CustomIcons[path.ToString()] = _clientApi.Gui.Icons.SvgIconSource(path);
+    }
+
+
+    private ICoreClientAPI? _clientApi;
 }

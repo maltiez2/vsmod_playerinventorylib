@@ -19,22 +19,21 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
     }
 
 
-    //public List<Action<GuiComposer>> rendertabhandlers = new();
-
     public override event Action? ComposeExtraGuis;
     public override event Action<int>? TabClicked;
-
-    /*public override string ToggleKeyCombinationCode => "characterdialog";
-    public override float ZSize => RuntimeEnv.GUIScale * 400;
-    public override List<GuiTab> Tabs => tabs;
-    public override List<Action<GuiComposer>> RenderTabHandlers => rendertabhandlers;
-    public override bool PrefersUngrabbedMouse => false;*/
 
 
     public ElementBounds? CharacterTabScrollAreaBounds { get; set; }
     public ElementBounds? DialogBounds { get; set; }
     public ElementBounds? BackgroundBounds { get; set; }
     public ElementBounds? CharacterTabClipBounds { get; set; }
+    public ElementBounds? InsetBounds { get => insetSlotBounds; set => insetSlotBounds = value; }
+
+    public IInventory? CharacterInventory => characterInv;
+    public float PlayerShapeYaw { get => yaw; set => yaw = value; }
+    public bool RotatePlayerShape { get => rotateCharacter; set => rotateCharacter = value; }
+    public ICoreClientAPI Api { get => clientApi; set => clientApi = value; }
+    public int CurrentTab { get => curTab; set => curTab = value; }
 
 
     public override void OnMouseDown(MouseEvent args)
@@ -197,29 +196,13 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
 
 
 
-    /*protected IInventory? characterInv;
-    protected ElementBounds? insetSlotBounds;
-    protected float yaw = -GameMath.PIHALF + 0.3f;
-    protected bool rotateCharacter;
-    protected bool showArmorSlots = true;
-    protected ICoreClientAPI clientApi;
-    protected int curTab = 0;
-    protected Vec4f lighPos = new Vec4f(-1, -1, 0, 0).NormalizeXYZ();
-    protected Matrixf mat = new();
-    protected int lastItemIdSelected = 0;
-    protected Size2d mainTabInnerSize = new();
-    protected List<GuiTab> tabs = [
-        new GuiTab() { Name = Lang.Get("charactertab-character"), DataInt = 0 }
-    ];*/
-
-
-    protected virtual void RegisterArmorIcons()
+    protected override void RegisterArmorIcons()
     {
         capi.Gui.Icons.CustomIcons["armorhead"] = capi.Gui.Icons.SvgIconSource(new AssetLocation("textures/icons/character/armor-helmet.svg"));
         capi.Gui.Icons.CustomIcons["armorbody"] = capi.Gui.Icons.SvgIconSource(new AssetLocation("textures/icons/character/armor-body.svg"));
         capi.Gui.Icons.CustomIcons["armorlegs"] = capi.Gui.Icons.SvgIconSource(new AssetLocation("textures/icons/character/armor-legs.svg"));
     }
-    protected virtual void ComposeCharacterTab(GuiComposer compo)
+    protected override void ComposeCharacterTab(GuiComposer compo)
     {
         if (!capi.Gui.Icons.CustomIcons.ContainsKey("armorhead"))
         {
@@ -228,7 +211,6 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         double padding = GuiElementItemSlotGridBase.unscaledSlotPadding;
         double slotSize = 48;
         double outerPaddding = 20;
-        double playerShapeWidth = 190;
         double verticalPadding = outerPaddding + padding;
         double internalPadding = 4;
         double bottomMiddleSectionInternalPadding = 2;
@@ -271,9 +253,6 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         topMiddleSectionBounds.WithParent(CharacterTabScrollAreaBounds);
         bottomMiddleSectionBounds.WithParent(CharacterTabScrollAreaBounds);
 
-        /*middleGroupInsetBounds.WithParent(bottomMiddleSectionBounds);
-        middleGroupSlotsBounds.WithParent(middleGroupInsetBounds);
-        middleGroupTextBounds.WithParent(middleGroupInsetBounds);*/
         rightClothesSlotsBounds.WithParent(topMiddleSectionBounds);
         leftClothesSlotsBounds.WithParent(topMiddleSectionBounds);
         insetSlotBounds.WithParent(topMiddleSectionBounds);
@@ -284,7 +263,6 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         rightClothesSlotsBounds.FixedRightOf(insetSlotBounds, internalPadding);
         rightSlotsColumnBounds.FixedRightOf(topMiddleSectionBounds, internalPadding);
         bottomMiddleSectionBounds.FixedRightOf(leftSlotsColumnBounds, internalPadding).FixedUnder(topMiddleSectionBounds, internalPadding);
-        //middleGroupSlotsBounds.FixedUnder(middleGroupTextBounds, bottomMiddleSectionInternalPadding * 2);
 
         compo.BeginClip(CharacterTabClipBounds);
         compo.BeginChildElements(CharacterTabScrollAreaBounds);
@@ -344,7 +322,6 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         );
         compo.GetScrollbar("scrollbar").SetScrollbarPosition(0);
     }
-
     protected virtual void OnNewScrollbarValue(float value)
     {
         if (CharacterTabScrollAreaBounds != null)
@@ -444,14 +421,13 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
             }
         }
     }
-
-    protected void OnTabClicked(int tabindex)
+    protected virtual void OnTabClicked(int tabindex)
     {
         TabClicked?.Invoke(tabindex);
         curTab = tabindex;
         ComposeGuis();
     }
-    protected void SendInvPacket(object packet)
+    protected virtual void SendInvPacket(object packet)
     {
         capi.Network.SendPacketClient(packet);
     }

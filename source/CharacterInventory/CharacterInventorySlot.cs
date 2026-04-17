@@ -17,9 +17,17 @@ public interface IClickableSlot
     event SlotClickedDelegate? OnSlotClicked;
 }
 
-public class PlayerInventorySlot : ItemSlot, IClickableSlot
+public interface IPlayerInventorySlot
 {
-    public PlayerInventorySlot(TagSet slotTag, string slotId, InventoryBase inventory, SlotConfig config) : base(inventory)
+    bool Enabled { get; }
+    string PlayerUid { get; }
+    string SlotId { get; }
+    public ComplexTagCondition<TagSet>? Tags { get; }
+}
+
+public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlot
+{
+    public PlayerInventorySlot(TagSet slotTag, string slotId, InventoryBase inventory, SlotConfig config, string playerUid) : base(inventory)
     {
         SlotId = slotId;
         SlotIdTag = slotTag;
@@ -28,14 +36,17 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot
         Tags = config.Tags;
         HexBackgroundColor = config.Color;
         BackgroundIcon = config.Icon;
+        PlayerUid = playerUid;
     }
 
 
+    public bool Enabled { get; set; } = true;
     public string SlotId { get; set; }
     public TagSet SlotIdTag { get; set; }
     public TagSet ExcludeTags { get; set; }
     public ComplexTagCondition<TagSet>? Tags { get; set; }
     public SlotConfig Config { get; }
+    public string PlayerUid { get; }
 
     public override EnumItemStorageFlags StorageType => EnumItemStorageFlags.General | EnumItemStorageFlags.Agriculture | EnumItemStorageFlags.Alchemy | EnumItemStorageFlags.Jewellery | EnumItemStorageFlags.Metallurgy | EnumItemStorageFlags.Outfit;
 
@@ -44,7 +55,8 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot
 
     public virtual bool FitsSlot(ItemStack stack)
     {
-        return stack.Collectible.Tags.Overlaps(SlotIdTag)
+        return Enabled
+            && stack.Collectible.Tags.Overlaps(SlotIdTag)
             && !stack.Collectible.Tags.Overlaps(ExcludeTags)
             && (Tags == null || Tags.Value.Matches(stack.Collectible.Tags));
     }
@@ -80,9 +92,9 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot
     }
 }
 
-public class CharacterInventorySlot : ItemSlotCharacter, IClickableSlot
+public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySlot
 {
-    public CharacterInventorySlot(TagSet slotTag, string slotId, InventoryBase inventory, CharacterSlotConfig config, EnumCharacterDressType dressType) : base(dressType, inventory)
+    public ClothesSlot(TagSet slotTag, string slotId, InventoryBase inventory, CharacterSlotConfig config, string playerUid, EnumCharacterDressType dressType) : base(dressType, inventory)
     {
         SlotId = slotId;
         SlotIdTag = slotTag;
@@ -91,6 +103,8 @@ public class CharacterInventorySlot : ItemSlotCharacter, IClickableSlot
         Tags = config.Tags;
         HexBackgroundColor = config.Color;
         BackgroundIcon = config.Icon;
+        PlayerUid = playerUid;
+
         if (dressType != EnumCharacterDressType.Unknown)
         {
             BackgroundIcon = IconByDressType[dressType];
@@ -98,11 +112,13 @@ public class CharacterInventorySlot : ItemSlotCharacter, IClickableSlot
     }
 
 
+    public bool Enabled { get; set; } = true;
     public string SlotId { get; set; }
     public TagSet SlotIdTag { get; set; }
     public TagSet ExcludeTags { get; set; }
     public ComplexTagCondition<TagSet>? Tags { get; set; }
     public CharacterSlotConfig Config { get; }
+    public string PlayerUid { get; }
 
     public override EnumItemStorageFlags StorageType => EnumItemStorageFlags.General | EnumItemStorageFlags.Agriculture | EnumItemStorageFlags.Alchemy | EnumItemStorageFlags.Jewellery | EnumItemStorageFlags.Metallurgy | EnumItemStorageFlags.Outfit;
 
@@ -111,7 +127,8 @@ public class CharacterInventorySlot : ItemSlotCharacter, IClickableSlot
 
     public virtual bool FitsSlot(ItemStack stack)
     {
-        return stack.Collectible.Tags.Overlaps(SlotIdTag)
+        return Enabled
+            && stack.Collectible.Tags.Overlaps(SlotIdTag)
             && !stack.Collectible.Tags.Overlaps(ExcludeTags)
             && (Tags == null || Tags.Value.Matches(stack.Collectible.Tags));
     }

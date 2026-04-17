@@ -5,5 +5,5 @@
 
 using System.Diagnostics.CodeAnalysis;
 
-[assembly: SuppressMessage("Critical Code Smell", "S1006:Method overrides should not change parameter defaults", Justification = "<Pending>", Scope = "member", Target = "~M:PlayerInventoryLib.CharacterInventorySlot.CanTakeFrom(Vintagestory.API.Common.ItemSlot,Vintagestory.API.Common.EnumMergePriority)~System.Boolean")]
-[assembly: SuppressMessage("Critical Code Smell", "S927:Parameter names should match base declaration and other partial definitions", Justification = "<Pending>", Scope = "member", Target = "~M:PlayerInventoryLib.CharacterInventorySlot.CanHold(Vintagestory.API.Common.ItemSlot)~System.Boolean")]
+[assembly: SuppressMessage("Critical Code Smell", "S1006:Method overrides should not change parameter defaults", Justification = "<Pending>", Scope = "member", Target = "~M:PlayerInventoryLib.ClothesSlot.CanTakeFrom(Vintagestory.API.Common.ItemSlot,Vintagestory.API.Common.EnumMergePriority)~System.Boolean")]
+[assembly: SuppressMessage("Critical Code Smell", "S927:Parameter names should match base declaration and other partial definitions", Justification = "<Pending>", Scope = "member", Target = "~M:PlayerInventoryLib.ClothesSlot.CanHold(Vintagestory.API.Common.ItemSlot)~System.Boolean")]

@@ -6,45 +6,6 @@ using Vintagestory.Common;
 
 namespace PlayerInventoryLib;
 
-public class CharacterInventorySlotsState
-{
-    public List<int> LeftSlots { get; } = [];
-    public List<int> RightSlots { get; } = [];
-    public List<(string, List<int>)> Groups { get; } = [];
-
-    public bool CompareAndSetFrom(CharacterInventorySlotsState other)
-    {
-        bool hasChanges = false;
-        
-        if (!LeftSlots.SequenceEqual(other.LeftSlots))
-        {
-            LeftSlots.Clear();
-            LeftSlots.AddRange(other.LeftSlots);
-            hasChanges = true;
-        }
-
-        if (!RightSlots.SequenceEqual(other.RightSlots))
-        {
-            RightSlots.Clear();
-            RightSlots.AddRange(other.RightSlots);
-            hasChanges = true;
-        }
-
-        bool groupsChanged = Groups.Count != other.Groups.Count ||
-            Groups
-                .Zip(other.Groups, (a, b) => a.Item1 != b.Item1 || !a.Item2.SequenceEqual(b.Item2))
-                .Any(changed => changed);
-
-        if (groupsChanged)
-        {
-            Groups.Clear();
-            Groups.AddRange(other.Groups.Select(group => (group.Item1, new List<int>(group.Item2))));
-            hasChanges = true;
-        }
-
-        return hasChanges;
-    }
-}
 
 public class CharacterInventory : InventoryCharacter
 {
@@ -90,6 +51,7 @@ public class CharacterInventory : InventoryCharacter
 
     public event Action<CharacterInventory, ItemSlot, string, int>? OnSlotModified;
 
+    public string OwnerUid => playerUID;
 
 
     public virtual ItemSlot GetSlot(string id) => SlotsById[id];

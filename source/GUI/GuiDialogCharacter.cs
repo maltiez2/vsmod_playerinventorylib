@@ -111,26 +111,27 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
     }
     public override void OnRenderGUI(float deltaTime)
     {
-        foreach (KeyValuePair<string, GuiComposer> val in Composers)
+        foreach ((_, GuiComposer composer) in Composers)
         {
-            val.Value.Render(deltaTime);
+            composer.Render(deltaTime);
 
-            MouseOverCursor = val.Value.MouseOverCursor;
+            MouseOverCursor = composer.MouseOverCursor;
         }
 
         if (curTab == 0)
         {
-            bool useScissor = CharacterTabClipBounds != null;
+            bool useScissor = InsetBounds != null && CharacterTabClipBounds != null;
             if (useScissor)
             {
-                ElementBounds cb = CharacterTabClipBounds;
                 int fbWidth = capi.Render.FrameWidth;
                 int fbHeight = capi.Render.FrameHeight;
 
-                int scissorX = (int)cb.renderX;
-                int scissorY = (int)(fbHeight - cb.renderY - cb.InnerHeight);
-                int scissorW = (int)cb.InnerWidth;
-                int scissorH = (int)cb.InnerHeight;
+                double top = fbHeight - CharacterTabClipBounds.renderY;
+
+                int scissorX = (int)(InsetBounds.renderX + GuiElement.scaled(1));
+                int scissorY = (int)(fbHeight - InsetBounds.renderY - InsetBounds.InnerHeight + GuiElement.scaled(2));
+                int scissorW = (int)(InsetBounds.InnerWidth - GuiElement.scaled(2));
+                int scissorH = (int)Math.Max(0, top - scissorY);
 
                 GL.Enable(EnableCap.ScissorTest);
                 GL.Scissor(scissorX, scissorY, scissorW, scissorH);
@@ -152,9 +153,9 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
             capi.Render.RenderEntityToGui(
                 deltaTime,
                 capi.World.Player.Entity,
-                insetSlotBounds.renderX + pad - GuiElement.scaled(20 + 21),
+                insetSlotBounds.renderX + pad - GuiElement.scaled(30),
                 insetSlotBounds.renderY + pad - GuiElement.scaled(30),
-                GuiElement.scaled(250),
+                GuiElement.scaled(240),
                 yaw,
                 (float)GuiElement.scaled(135),
                 ColorUtil.WhiteArgb);
@@ -178,6 +179,9 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
     }
     public override void OnGuiOpened()
     {
+        SlotsSystem.RecalculateSlotsState(clientApi.World.Player);
+        CharacterTabSlotsState.CompareAndSetFrom(SlotsSystem.SlotsState);
+
         ComposeGuis();
 
         if (capi.World.Player.WorldData.CurrentGameMode == EnumGameMode.Guest || capi.World.Player.WorldData.CurrentGameMode == EnumGameMode.Survival)
@@ -228,6 +232,7 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         int groupsNumber = CharacterTabSlotsState.Groups.Count;
 
         CairoFont groupFont = CairoFont.WhiteSmallText();
+        groupFont.Orientation = EnumTextOrientation.Center;
 
         // Outer columns
         ElementBounds leftSlotsColumnBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, internalPadding, verticalPadding, 1, outerColumnSlotsNumber).FixedGrow(0, padding);
@@ -271,8 +276,8 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         compo.BeginChildElements(CharacterTabScrollAreaBounds);
 
         compo.AddScrollableInset(bottomMiddleSectionBounds, 0, 1);
-        compo.AddScrollableInset(topMiddleSectionBounds, 3, 0.8f);
-        compo.AddScrollableInset(insetSlotBounds, 0, 1.0f);
+        compo.AddScrollableInset(topMiddleSectionBounds, 0, 1);
+        compo.AddScrollableInset(insetSlotBounds, 3, 0.8f);
 
         compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, CharacterTabSlotsState.LeftSlots.ToArray(), leftSlotsColumnBounds, "leftLeftSlots");
         compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, [0, 1, 2, 11, 3, 4], leftClothesSlotsBounds, "leftSlots");
@@ -285,12 +290,15 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         {
             int slotsInGroup = slotIndexes.Count;
             int rows = (int)Math.Ceiling((float)slotsInGroup / slotsInRowNumber);
+            int slotsWidth = slotsInGroup < slotsInRowNumber ? slotsInGroup : slotsInRowNumber;
 
             string groupText = Lang.Get(SlotsSystem.GroupIdToGuiConfig[groupCode].Text);
 
-            ElementBounds slotsBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, bottomMiddleSectionInternalPadding, bottomMiddleSectionInternalPadding, slotsInRowNumber, rows).FixedGrow(0, padding);
+            ElementBounds slotsBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, bottomMiddleSectionInternalPadding, bottomMiddleSectionInternalPadding, slotsInRowNumber, rows);
             ElementBounds textBounds = ElementBounds.Fixed(bottomMiddleSectionInternalPadding, 2, slotsBounds.fixedWidth - bottomMiddleSectionInternalPadding, textHeight);
-            ElementBounds insetBounds = ElementBounds.Fixed(0, 0, slotsBounds.fixedWidth + bottomMiddleSectionInternalPadding + 3, textBounds.fixedHeight + slotsBounds.fixedHeight + bottomMiddleSectionInternalPadding).FixedGrow(0, padding);
+            ElementBounds insetBounds = ElementBounds.Fixed(0, 0, slotsBounds.fixedWidth + bottomMiddleSectionInternalPadding + 3, textBounds.fixedHeight + slotsBounds.fixedHeight + bottomMiddleSectionInternalPadding + padding).FixedGrow(0, padding);
+            
+            slotsBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, bottomMiddleSectionInternalPadding, bottomMiddleSectionInternalPadding, slotsWidth, rows).WithAlignment(EnumDialogArea.CenterTop).FixedGrow(0, padding);
 
             insetBounds.WithParent(bottomMiddleSectionBounds);
             textBounds.WithParent(insetBounds);

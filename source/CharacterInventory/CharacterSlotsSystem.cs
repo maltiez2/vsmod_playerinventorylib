@@ -15,37 +15,43 @@ public interface IEnableSlots
     Dictionary<string, CharacterSlotConfig> GetConfigOverrides();
 }
 
-public class DuplicatedSlotIdException : Exception
+public class CharacterInventorySlotsState
 {
-    public DuplicatedSlotIdException()
-    {
-    }
+    public List<int> LeftSlots { get; } = [];
+    public List<int> RightSlots { get; } = [];
+    public List<(string, List<int>)> Groups { get; } = [];
 
-    public DuplicatedSlotIdException(string message)
-        : base("[Player Inventory lib] " + message)
+    public bool CompareAndSetFrom(CharacterInventorySlotsState other)
     {
-    }
+        bool hasChanges = false;
 
-    public DuplicatedSlotIdException(string message, Exception innerException)
-        : base("[Player Inventory lib] " + message, innerException)
-    {
-    }
-}
+        if (!LeftSlots.SequenceEqual(other.LeftSlots))
+        {
+            LeftSlots.Clear();
+            LeftSlots.AddRange(other.LeftSlots);
+            hasChanges = true;
+        }
 
-public class UnknownSlotIdException : Exception
-{
-    public UnknownSlotIdException()
-    {
-    }
+        if (!RightSlots.SequenceEqual(other.RightSlots))
+        {
+            RightSlots.Clear();
+            RightSlots.AddRange(other.RightSlots);
+            hasChanges = true;
+        }
 
-    public UnknownSlotIdException(string message)
-        : base("[Player Inventory lib] " + message)
-    {
-    }
+        bool groupsChanged = Groups.Count != other.Groups.Count ||
+            Groups
+                .Zip(other.Groups, (a, b) => a.Item1 != b.Item1 || !a.Item2.SequenceEqual(b.Item2))
+                .Any(changed => changed);
 
-    public UnknownSlotIdException(string message, Exception innerException)
-        : base("[Player Inventory lib] " + message, innerException)
-    {
+        if (groupsChanged)
+        {
+            Groups.Clear();
+            Groups.AddRange(other.Groups.Select(group => (group.Item1, new List<int>(group.Item2))));
+            hasChanges = true;
+        }
+
+        return hasChanges;
     }
 }
 
@@ -96,6 +102,7 @@ public class CharacterSlotsSystem : ModSystem
         "ArmorLegs"
     ];
     public HashSet<string> SlotsThatDropItemsOnDeath { get; } = [];
+    public CharacterInventorySlotsState SlotsState { get; } = new();
 
     public event Action? OnReady;
 
@@ -104,9 +111,8 @@ public class CharacterSlotsSystem : ModSystem
 
     public void RegisterSlotGroup(string groupId, CharacterSlotGroupGuiConfig config)
     {
-
+        _groupConfigs.Add(groupId, config);
     }
-
     public void RegisterSlot(string slotId, CreateCharacterSlotDelegate createSlotDelegate, CharacterSlotConfig config)
     {
         if (_createSlotDelegates.ContainsKey(slotId))
@@ -117,6 +123,11 @@ public class CharacterSlotsSystem : ModSystem
         _createSlotDelegates.Add(slotId, createSlotDelegate);
         _configs.Add(slotId, config);
     }
+    public void RegisterSlot(string slotId, CharacterSlotConfig config)
+    {
+        RegisterSlot(slotId, CreatePlayerInventorySlot, config);
+    }
+
 
     public ItemSlot CreateSlot(string slotId, out int index, CharacterInventory inventory, ItemStack? stack, string playerUid)
     {
@@ -132,6 +143,68 @@ public class CharacterSlotsSystem : ModSystem
 
         index = SlotIdToIndex[slotId];
         return _createSlotDelegates[slotId].Invoke(inventory, stack, playerUid, _api, index, slotId);
+    }
+    public bool RecalculateSlotsState(IPlayer player)
+    {
+        CharacterInventory? inventory = GeneralUtils.GetCharacterInventory(player);
+        if (inventory == null)
+        {
+            return false;
+        }
+
+        CharacterInventorySlotsState newState = new();
+
+        List<(string, List<int>)> groups = [];
+        foreach ((string groupId, CharacterSlotGroupGuiConfig groupConfig) in GroupIdToGuiConfig)
+        {
+            groups.Add((groupId, []));
+        }
+
+        foreach ((string slotId, CharacterSlotConfig slotConfig) in SlotIdToConfig)
+        {
+            ItemSlot slot = inventory.GetSlot(slotId);
+            if (slot is not IPlayerInventorySlot playerSlot)
+            {
+                continue;
+            }
+
+            if (!playerSlot.Enabled && slotConfig.HiddenWhenDisabled)
+            {
+                continue;
+            }
+
+            switch (slotConfig.Group)
+            {
+                case null:
+                    break;
+                case "left":
+                    newState.LeftSlots.Add(SlotIdToIndex[slotId]);
+                    break;
+                case "right":
+                    newState.RightSlots.Add(SlotIdToIndex[slotId]);
+                    break;
+                default:
+                    foreach ((string groupId, List<int> indexes) in groups)
+                    {
+                        if (groupId == slotConfig.Group)
+                        {
+                            indexes.Add(SlotIdToIndex[slotId]);
+                            break;
+                        }
+                    }
+                    break;
+            }
+        }
+
+        foreach ((string groupId, List<int> indexes) in groups)
+        {
+            if (indexes.Count > 0)
+            {
+                newState.Groups.Add((groupId, indexes));
+            }
+        }
+
+        return SlotsState.CompareAndSetFrom(newState);
     }
 
 
@@ -167,7 +240,7 @@ public class CharacterSlotsSystem : ModSystem
         }
     }
 
-    
+
 
     private readonly Dictionary<string, CreateCharacterSlotDelegate> _createSlotDelegates = [];
     private readonly Dictionary<string, CharacterSlotConfig> _configs = [];
@@ -188,6 +261,7 @@ public class CharacterSlotsSystem : ModSystem
         }
         SlotIdToIndex = idToIndex.ToImmutableDictionary();
         SlotIdToConfig = _configs.ToImmutableDictionary();
+        GroupIdToGuiConfig = _groupConfigs.ToImmutableDictionary();
 
         LoggerUtil.Notify(_api, this, $"Registered character slots: {SlotIndexToId.Aggregate((a, b) => $"{a}, {b}")}");
     }
@@ -241,19 +315,50 @@ public class CharacterSlotsSystem : ModSystem
 
     private void RegisterVanillaSlots()
     {
+        CharacterSlotGroupGuiConfig armorConfig = new()
+        {
+            Text = "Armor",
+        };
+
+        RegisterSlotGroup("armor", armorConfig);
+
+
         foreach (string id in DefaultVanillaSlotsOrder)
         {
-            RegisterSlot(id, CreateClothesSlot, new());
+            CharacterSlotConfig config = id switch
+            {
+                "ArmorHead" => new()
+                {
+                    Group = "armor"
+                },
+                "ArmorBody" => new()
+                {
+                    Group = "armor"
+                },
+                "ArmorLegs" => new()
+                {
+                    Group = "armor"
+                },
+                _ => new()
+            };
+
+            RegisterSlot(id, CreateClothesSlot, config);
         }
     }
 
     private ItemSlot CreateClothesSlot(CharacterInventory inventory, ItemStack? stack, string playerUid, ICoreAPI api, int index, string id)
     {
-        return new CharacterInventorySlot(SlotIdToTag[id], id, inventory, _configs[id], Enum.Parse<EnumCharacterDressType>(id));
+        return new ClothesSlot(SlotIdToTag[id], id, inventory, _configs[id], playerUid, Enum.Parse<EnumCharacterDressType>(id))
+        {
+            Itemstack = stack
+        };
     }
 
     private ItemSlot CreatePlayerInventorySlot(CharacterInventory inventory, ItemStack? stack, string playerUid, ICoreAPI api, int index, string id)
     {
-        return new PlayerInventorySlot(SlotIdToTag[id], id, inventory, _configs[id]);
+        return new PlayerInventorySlot(SlotIdToTag[id], id, inventory, _configs[id], playerUid)
+        {
+            Itemstack = stack
+        };
     }
 }

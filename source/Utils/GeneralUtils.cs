@@ -11,8 +11,8 @@ public static class GeneralUtils
         return player?.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName) as InventoryPlayerBackpacks;
     }
 
-    public static InventoryCharacter? GetCharacterInventory(IPlayer? player)
+    public static CharacterInventory? GetCharacterInventory(IPlayer? player)
     {
-        return player?.InventoryManager.GetOwnInventory(GlobalConstants.characterInvClassName) as InventoryCharacter;
+        return player?.InventoryManager.GetOwnInventory(GlobalConstants.characterInvClassName) as CharacterInventory;
     }
 }

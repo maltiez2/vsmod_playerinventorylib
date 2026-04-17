@@ -61,6 +61,7 @@
   <!-- Project item includes -->
   <ItemGroup>
     <Folder Include="resources\assets\playerinventorylib" />
+    <Folder Include="source\BackpackInventory\" />
   </ItemGroup>
 
   <!-- Formatting JSON files -->

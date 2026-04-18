@@ -125,6 +125,16 @@ public class CharacterSlotsSystem : ModSystem
         _createSlotDelegates.Add(slotId, createSlotDelegate);
         _configs.Add(slotId, config);
     }
+    public void RegisterPlayerInventorySlot(string slotId, CharacterSlotConfig config)
+    {
+        if (_createSlotDelegates.ContainsKey(slotId))
+        {
+            throw new DuplicatedSlotIdException($"Slot with id '{slotId}' already registered.");
+        }
+
+        _createSlotDelegates.Add(slotId, CreatePlayerInventorySlot);
+        _configs.Add(slotId, config);
+    }
     public void RegisterSlot(string slotId, CharacterSlotConfig config)
     {
         RegisterSlot(slotId, CreatePlayerInventorySlot, config);

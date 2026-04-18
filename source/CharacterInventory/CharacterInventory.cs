@@ -106,7 +106,7 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
         tree.SetInt("version", CurrentImplementationVersion);
     }
 
-    public virtual void BeforeSlotModified(ItemSlot slot, ref ItemStackMoveOperation op)
+    public virtual void BeforeTakeOutWhole(ItemSlot slot)
     {
 
     }

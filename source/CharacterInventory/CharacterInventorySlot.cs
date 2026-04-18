@@ -90,6 +90,16 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
 
         return base.CanHold(sourceSlot);
     }
+
+    public override ItemStack TakeOutWhole()
+    {
+        if (inventory is IPlayerInventory playerInventory)
+        {
+            playerInventory.BeforeTakeOutWhole(this);
+        }
+
+        return base.TakeOutWhole();
+    }
 }
 
 public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySlot
@@ -162,8 +172,17 @@ public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySl
 
         return base.CanHold(sourceSlot);
     }
-    
-    
+    public override ItemStack TakeOutWhole()
+    {
+        if (inventory is IPlayerInventory playerInventory)
+        {
+            playerInventory.BeforeTakeOutWhole(this);
+        }
+
+        return base.TakeOutWhole();
+    }
+
+
 
     protected override bool CheckDressType(IItemStack itemstack, EnumCharacterDressType dressType) => true;
 

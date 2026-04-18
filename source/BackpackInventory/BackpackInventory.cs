@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿using PlayerInventoryLib.Utils;
+using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
@@ -6,103 +7,6 @@ using Vintagestory.API.MathTools;
 using Vintagestory.Common;
 
 namespace PlayerInventoryLib;
-
-public class PlaceholderItemSlot : ItemSlot, IPlayerInventorySlot
-{
-    public PlaceholderItemSlot(string playerUid, string slotId, InventoryBase inventory) : base(inventory)
-    {
-        PlayerUid = playerUid;
-        SlotId = slotId;
-    }
-
-    public bool Enabled => false;
-
-    public string PlayerUid { get; }
-
-    public string SlotId { get; }
-
-    public ComplexTagCondition<TagSet>? Tags => null;
-}
-
-public class BackpackSlot : PlayerInventorySlot, IBackpackSlot
-{
-    public BackpackSlot(string backpackSlotId, IBackpack backpack, string slotId, InventoryBase inventory, BackpackSlotConfig config, string playerUid) : base(TagSet.Empty, slotId, inventory, config, playerUid)
-    {
-        BackpackSlotConfig = config;
-        BackpackSlotId = backpackSlotId;
-        Backpack = backpack;
-    }
-
-    public int SlotIndex { get; set; }
-    public string BackpackSlotId { get; }
-    public IBackpack Backpack { get; }
-    public BackpackSlotConfig BackpackSlotConfig { get; }
-}
-
-public class SlotForVanillaBackpack : ItemSlotBackpack, IPlayerInventorySlot
-{
-    public SlotForVanillaBackpack(string playerUid, string slotId, InventoryBase inventory) : base(inventory)
-    {
-        PlayerUid = playerUid;
-        SlotId = slotId;
-    }
-
-    public bool Enabled { get; set; } = true;
-
-    public string PlayerUid { get; }
-
-    public string SlotId { get; }
-
-    public ComplexTagCondition<TagSet>? Tags => null;
-
-    public override ItemStack TakeOutWhole()
-    {
-        if (inventory is IPlayerInventory playerInventory)
-        {
-            playerInventory.BeforeTakeOutWhole(this);
-        }
-
-        return base.TakeOutWhole();
-    }
-}
-
-public interface IBackpackSlot : IPlayerInventorySlot
-{
-    int SlotIndex { get; }
-    string BackpackSlotId { get; }
-    IBackpack Backpack { get; }
-    BackpackSlotConfig BackpackSlotConfig { get; }
-}
-
-public interface IPlayerInventory : IOwnedInventory
-{
-    void BeforeTakeOutWhole(ItemSlot slot);
-    void OnItemSlotModified(ItemSlot slot);
-}
-
-public interface IBackpack
-{
-    string BackpackId { get; }
-
-    Dictionary<string, BackpackSlotConfig> GetSlotsConfigs(ItemStack stack, IPlayerInventorySlot slotBackpackIsIn);
-    void StoreSlots(ItemStack stack, IPlayerInventorySlot slot, Dictionary<string, ItemSlot> slots);
-    void OnBackpackSlotModified(ItemSlot slot);
-    /// <summary>
-    /// If it is required to regenerate slots, when slot if modified, but itemtype was not changed.
-    /// </summary>
-    /// <param name="previous">ItemStack before slot modified, no logner in any slot</param>
-    /// <param name="current">ItemStack after slot modified, in slotBackpackIsIn</param>
-    /// <param name="slotBackpackIsIn">Slot current backpack is in</param>
-    /// <returns>if 'true', BackpackInventory.RemoveSlots and BackpackInventory.AddSlots will be called</returns>
-    bool RequiresSlotsReload(ItemStack previous, ItemStack current, IPlayerInventorySlot slotBackpackIsIn);
-}
-
-public class BackpackSlotConfig : SlotConfig
-{
-    public float Priority { get; set; } = 0;
-    public string? BackpackCategory { get; set; }
-    public float BackpackCategoryPriority { get; set; } = 0;
-}
 
 
 public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
@@ -112,24 +16,14 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         SlotsSystem = api.ModLoader.GetModSystem<CharacterSlotsSystem>() ?? throw new InvalidOperationException("Unable to find CharacterSlotsSystem");
         PlaceholderSlot = new(playerUID, "placeholder", this);
         SlotsForBackpacksCount = SlotsSystem.BackpackSlotsCount;
-        for (int slotIndex = 0; slotIndex < SlotsForBackpacksCount; slotIndex++)
-        {
-            SlotForVanillaBackpack slotForBackpack = new(playerUID, $"self{slotIndex}", this);
-            SlotsByIndex.Add(slotForBackpack);
-            SlotsBySlotId.Add($"self{slotIndex}", slotForBackpack);
-        }
+        GenerateSlotsForVanillaBackpacks();
     }
     public BackpackInventory(string inventoryId, ICoreAPI api) : base(inventoryId, api)
     {
         SlotsSystem = api.ModLoader.GetModSystem<CharacterSlotsSystem>() ?? throw new InvalidOperationException("Unable to find CharacterSlotsSystem");
         PlaceholderSlot = new(playerUID, "placeholder", this);
         SlotsForBackpacksCount = SlotsSystem.BackpackSlotsCount;
-        for (int slotIndex = 0; slotIndex < SlotsForBackpacksCount; slotIndex++)
-        {
-            SlotForVanillaBackpack slotForBackpack = new(playerUID, $"self{slotIndex}", this);
-            SlotsByIndex.Add(slotForBackpack);
-            SlotsBySlotId.Add($"self{slotIndex}", slotForBackpack);
-        }
+        GenerateSlotsForVanillaBackpacks();
     }
 
 
@@ -146,6 +40,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
     }
     public override int Count => SlotsByIndex.Count;
     public override int CountForNetworkPacket => Count;
+    public string PlayerUID => playerUID;
 
 
     public override void AfterBlocksLoaded(IWorldAccessor world)
@@ -159,8 +54,6 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
             return;
         }
 
-        PreviousBackpackStacks[slotForBackpack.SlotId] = slot.Itemstack?.Clone();
-
         IBackpack? backpack = slot.Itemstack?.Collectible?.GetCollectibleInterface<IBackpack>();
         if (backpack != null && slot.Itemstack != null)
         {
@@ -171,26 +64,23 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
     {
         if (slot is IBackpackSlot backpackSlot)
         {
-            backpackSlot.Backpack.OnBackpackSlotModified(slot);
+            backpackSlot.Backpack.OnBackpackSlotModified(backpackSlot);
         }
         else if (slot is SlotForVanillaBackpack slotForBackpack)
         {
             IBackpack? backpack = slot.Itemstack?.Collectible?.GetCollectibleInterface<IBackpack>();
-            if (PreviousBackpackStacks.TryGetValue(slotForBackpack.SlotId, out ItemStack? previousStack)
-                && previousStack != null
-                && slot.Itemstack != null
-                && slot.Itemstack.Id == previousStack.Id
-                && backpack != null)
+            if (backpack != null && slot.Itemstack != null)
             {
-                if (backpack.RequiresSlotsReload(previousStack, slot.Itemstack, slotForBackpack))
+                string backpackId = $"{slotForBackpack.SlotId}@{backpack.BackpackId}";
+                if (SlotsByBackpackSlotId.ContainsKey(backpackId))
                 {
-                    RemoveSlots(backpack, previousStack, slotForBackpack);
-                    AddSlots(backpack, slot.Itemstack, slotForBackpack);
+                    if (backpack.RequiresSlotsReload(slotForBackpack))
+                    {
+                        RemoveSlots(backpack, null, slotForBackpack);
+                        AddSlots(backpack, slot.Itemstack, slotForBackpack);
+                    }
                 }
-            }
-            else
-            {
-                if (backpack != null && slot.Itemstack != null)
+                else
                 {
                     AddSlots(backpack, slot.Itemstack, slotForBackpack);
                 }
@@ -278,7 +168,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         }
 
         DeserializedSlotsContent.Clear();
-        foreach (string slotId in SlotsSystem.SlotIndexToId)
+        foreach ((string slotId, _) in slotsTree)
         {
             ItemStack? itemStack = slotsTree.GetItemstack(slotId);
             DeserializedSlotsContent.Add(slotId, itemStack);
@@ -322,6 +212,18 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         tree["slots"] = PreviousVanillaSerializedData;
         tree.SetInt("version", CurrentImplementationVersion);
     }
+    public override void ResolveBlocksOrItems()
+    {
+        foreach ((string code, ItemStack? stack) in DeserializedSlotsContent)
+        {
+            if (stack != null && !stack.ResolveBlockOrItem(Api.World))
+            {
+                DeserializedSlotsContent[code] = null;
+            }
+        }
+
+        base.ResolveBlocksOrItems();
+    }
 
 
     public virtual bool AddSlots(IBackpack backpack, ItemStack backpackStack, IPlayerInventorySlot slotBackpackIsIn, bool setFromDeserialized = true)
@@ -334,16 +236,20 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         }
         SlotsByBackpackSlotId[backpackId] = [];
 
-        Dictionary<string, BackpackSlotConfig> backpackSlots = backpack.GetSlotsConfigs(backpackStack, slotBackpackIsIn);
-        foreach ((string slotId, BackpackSlotConfig config) in backpackSlots)
+        Dictionary<string, ItemSlot> backpackSlots = backpack.GenerateSlots(backpackStack, slotBackpackIsIn, playerUID);
+        foreach ((string slotId, ItemSlot slot) in backpackSlots)
         {
+            if (slot is not IBackpackSlot backpackSlot)
+            {
+                LoggerUtil.Error(Api, this, $"Trying to add backpack slots from '{backpackStack.Collectible?.Code}' but supplied slot with id '{slotId}' is not 'IBackpackSlot'");
+                continue;
+            }
+            
             string backpackSlotId = $"{backpackId}@{slotId}";
-
-            BackpackSlot slot = new(backpackSlotId, backpack, slotId, this, config, playerUID);
 
             SlotsBySlotId[backpackSlotId] = slot;
             SlotsByBackpackSlotId[backpackId].Add(slotId, slot);
-            slot.SlotIndex = AddSlot(slot);
+            backpackSlot.SlotIndex = AddSlot(slot);
 
             if (setFromDeserialized && DeserializedSlotsContent.TryGetValue(backpackSlotId, out ItemStack? backpackSlotStack))
             {
@@ -354,7 +260,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
 
         return true;
     }
-    public virtual bool RemoveSlots(IBackpack backpack, ItemStack backpackStack, IPlayerInventorySlot slotBackpackIsIn, bool storeSlots = true)
+    public virtual bool RemoveSlots(IBackpack backpack, ItemStack? backpackStack, IPlayerInventorySlot slotBackpackIsIn, bool storeSlots = true)
     {
         string backpackId = $"{slotBackpackIsIn.SlotId}@{backpack.BackpackId}";
 
@@ -379,7 +285,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
             RemoveSlot(backpackSlot);
         }
 
-        if (storeSlots)
+        if (storeSlots && backpackStack != null)
         {
             backpack.StoreSlots(backpackStack, slotBackpackIsIn, backpackSlots);
         }
@@ -399,11 +305,44 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         backpackSlots = new ReadOnlyDictionary<string, ItemSlot>(backpackSlotsValue);
         return true;
     }
-    public virtual ItemSlot GetSlotByBackpackId(string backpackId)
+    public virtual ItemSlot GetSlotByBackpackSlotId(string backpackSlotId)
     {
-        return SlotsBySlotId[backpackId];
+        return SlotsBySlotId[backpackSlotId];
     }
 
+    public override float GetSuitability(ItemSlot sourceSlot, ItemSlot targetSlot, bool isMerge)
+    {
+        float multiplier = (sourceSlot.Itemstack.Collectible.GetStorageFlags(sourceSlot.Itemstack) & EnumItemStorageFlags.Backpack) > 0 ? 2 : 1;
+
+        // It feels more intuitive to not move stuff into the backpack inventory if it's closed
+        // but we test if its a DummySlot, because stuff collected from the ground should still go into the backpack inv
+        if (targetSlot is ItemSlotBagContent && !openedByPlayerGUIds.Contains(playerUID) && !(sourceSlot is DummySlot))
+        {
+            multiplier *= 0.35f;
+        }
+
+        if (targetSlot is ItemSlotBagContent)
+        {
+            bool singleFlag = (targetSlot.StorageType & (targetSlot.StorageType - 1)) == 0;
+            if (singleFlag && (targetSlot.StorageType & sourceSlot.Itemstack.Collectible.GetStorageFlags(sourceSlot.Itemstack)) > 0)
+            {
+                multiplier *= 1.2f;
+            }
+        }
+
+        return
+            (base.GetSuitability(sourceSlot, targetSlot, isMerge)
+            + ((sourceSlot.Inventory is InventoryGeneric && sourceSlot.Itemstack?.Collectible.GetTool(sourceSlot) == null) ? 1 : 0)) * multiplier
+            + ((sourceSlot is ItemSlotOutput || sourceSlot is ItemSlotCraftingOutput) ? 1 : 0)
+        ;
+    }
+
+    public virtual float GetSuitability(ItemSlot sourceSlot, ItemSlot targetSlot, bool isMerge)
+    {
+        float extraWeight = targetSlot is ItemSlotBackpack && (sourceSlot.Itemstack.Collectible.GetStorageFlags(sourceSlot.Itemstack) & EnumItemStorageFlags.Backpack) > 0 ? 2 : 0;
+
+        return baseWeight + extraWeight + (isMerge ? 3 : 1);
+    }
 
 
     protected const int CurrentImplementationVersion = 1;
@@ -412,13 +351,12 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
     protected readonly Dictionary<string, Dictionary<string, ItemSlot>> SlotsByBackpackSlotId = [];
     protected readonly List<ItemSlot> SlotsByIndex = [];
     protected readonly PlaceholderItemSlot PlaceholderSlot;
-    protected readonly Dictionary<string, ItemStack> DeserializedSlotsContent = [];
+    protected readonly Dictionary<string, ItemStack?> DeserializedSlotsContent = [];
     protected ITreeAttribute PreviousSerializedData = new TreeAttribute();
     protected ITreeAttribute PreviousVanillaSerializedData = new TreeAttribute();
     protected readonly int SlotsForBackpacksCount;
     protected int VanillaSlotsCount = 4;
     protected const string SlotsDataAttributeName = "plrinvlib:slots";
-    protected readonly Dictionary<string, ItemStack?> PreviousBackpackStacks = [];
 
 
     protected virtual int AddSlot(ItemSlot slot)
@@ -480,6 +418,15 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
             RemoveSlots(backpack, slotByIndex.Itemstack, slotForBackpack, storeSlots: false);
             AddSlots(backpack, slotByIndex.Itemstack, slotForBackpack, setFromDeserialized: false);
             slotByIndex.MarkDirty();
+        }
+    }
+    protected void GenerateSlotsForVanillaBackpacks()
+    {
+        for (int slotIndex = 0; slotIndex < SlotsForBackpacksCount; slotIndex++)
+        {
+            SlotForVanillaBackpack slotForBackpack = new(playerUID, $"self{slotIndex}", this);
+            SlotsByIndex.Add(slotForBackpack);
+            SlotsBySlotId.Add($"self{slotIndex}", slotForBackpack);
         }
     }
 }

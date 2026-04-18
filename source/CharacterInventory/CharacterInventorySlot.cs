@@ -56,7 +56,7 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
     public virtual bool FitsSlot(ItemStack stack)
     {
         return Enabled
-            && stack.Collectible.Tags.Overlaps(SlotIdTag)
+            && (SlotIdTag.IsEmpty || stack.Collectible.Tags.Overlaps(SlotIdTag))
             && !stack.Collectible.Tags.Overlaps(ExcludeTags)
             && (Tags == null || Tags.Value.Matches(stack.Collectible.Tags));
     }

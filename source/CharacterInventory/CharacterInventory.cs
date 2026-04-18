@@ -122,11 +122,20 @@ public class CharacterInventory : InventoryCharacter
 
     public override void OnOwningEntityDeath(Vec3d pos)
     {
+        IPlayer? player = Api.World.PlayerByUid(playerUID);
+        BackpackInventory? backpackInventory = GeneralUtils.GetBackpackInventory(player);
+
         foreach (string slotId in SlotsSystem.SlotsThatDropItemsOnDeath)
         {
             ItemSlot slot = SlotsById[slotId];
 
             if (slot.Itemstack == null) continue;
+
+            IBackpack? backpack = slot.Itemstack?.Collectible?.GetCollectibleInterface<IBackpack>();
+            if (backpackInventory != null && backpack != null && slot is IPlayerInventorySlot playerSlot && slot.Itemstack != null)
+            {
+                backpackInventory.RemoveSlots(backpack, slot.Itemstack, playerSlot);
+            }
 
             Api.World.SpawnItemEntity(slot.Itemstack, pos);
 

@@ -103,6 +103,8 @@ public class CharacterSlotsSystem : ModSystem
     ];
     public HashSet<string> SlotsThatDropItemsOnDeath { get; } = [];
     public CharacterInventorySlotsState SlotsState { get; } = new();
+    public int BackpackSlotsCount { get; set; } = 4;
+    public bool DropBackpackContent { get; set; } = true;
 
     public event Action? OnReady;
 

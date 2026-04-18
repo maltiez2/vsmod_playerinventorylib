@@ -6,9 +6,9 @@ namespace PlayerInventoryLib;
 
 public static class GeneralUtils
 {
-    public static InventoryPlayerBackpacks? GetBackpackInventory(IPlayer? player)
+    public static BackpackInventory? GetBackpackInventory(IPlayer? player)
     {
-        return player?.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName) as InventoryPlayerBackpacks;
+        return player?.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName) as BackpackInventory;
     }
 
     public static CharacterInventory? GetCharacterInventory(IPlayer? player)

@@ -64,6 +64,12 @@ public interface IBackpackSlot : IPlayerInventorySlot
     BackpackSlotConfig BackpackSlotConfig { get; }
 }
 
+public interface IPlayerInventory : IOwnedInventory
+{
+    void BeforeSlotModified(ItemSlot slot, ItemStackMoveOperation op, bool stackRemoved);
+    void OnItemSlotModified(ItemSlot slot);
+}
+
 public interface IBackpack
 {
     string BackpackId { get; }
@@ -71,6 +77,13 @@ public interface IBackpack
     Dictionary<string, BackpackSlotConfig> GetSlotsConfigs(ItemStack stack, IPlayerInventorySlot slotBackpackIsIn);
     void StoreSlots(ItemStack stack, IPlayerInventorySlot slot, Dictionary<string, ItemSlot> slots);
     void OnBackpackSlotModified(ItemSlot slot);
+    /// <summary>
+    /// If it is required to regenerate slots, when slot if modified, but itemtype was not changed.
+    /// </summary>
+    /// <param name="previous">ItemStack before slot modified, no logner in any slot</param>
+    /// <param name="current">ItemStack after slot modified, in slotBackpackIsIn</param>
+    /// <param name="slotBackpackIsIn">Slot current backpack is in</param>
+    /// <returns>if 'true', BackpackInventory.RemoveSlots and BackpackInventory.AddSlots will be called</returns>
     bool RequiresSlotsReload(ItemStack previous, ItemStack current, IPlayerInventorySlot slotBackpackIsIn);
 }
 
@@ -82,7 +95,7 @@ public class BackpackSlotConfig : SlotConfig
 }
 
 
-public class BackpackInventory : InventoryPlayerBackpacks
+public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
 {
     public BackpackInventory(string className, string playerUID, ICoreAPI api) : base(className, playerUID, api)
     {
@@ -134,11 +147,54 @@ public class BackpackInventory : InventoryPlayerBackpacks
         ResolveBlocksOrItems();
 
     }
+    public virtual void BeforeSlotModified(ItemSlot slot, ItemStackMoveOperation op, bool stackRemoved)
+    {
+        if (slot is not SlotForVanillaBackpack slotForBackpack)
+        {
+            return;
+        }
+
+        PreviousBackpackStacks[slotForBackpack.SlotId] = slot.Itemstack?.Clone();
+
+        if (!stackRemoved)
+        {
+            return; 
+        }
+
+        IBackpack? backpack = slot.Itemstack?.Collectible?.GetCollectibleInterface<IBackpack>();
+        if (backpack != null && slot.Itemstack != null)
+        {
+            RemoveSlots(backpack, slot.Itemstack, slotForBackpack);
+        }
+    }
     public override void OnItemSlotModified(ItemSlot slot)
     {
         if (slot is IBackpackSlot backpackSlot)
         {
             backpackSlot.Backpack.OnBackpackSlotModified(slot);
+        }
+        else if (slot is SlotForVanillaBackpack slotForBackpack)
+        {
+            IBackpack? backpack = slot.Itemstack?.Collectible?.GetCollectibleInterface<IBackpack>();
+            if (PreviousBackpackStacks.TryGetValue(slotForBackpack.SlotId, out ItemStack? previousStack)
+                && previousStack != null
+                && slot.Itemstack != null
+                && slot.Itemstack.Id == previousStack.Id
+                && backpack != null)
+            {
+                if (backpack.RequiresSlotsReload(previousStack, slot.Itemstack, slotForBackpack))
+                {
+                    RemoveSlots(backpack, previousStack, slotForBackpack);
+                    AddSlots(backpack, slot.Itemstack, slotForBackpack);
+                }
+            }
+            else
+            {
+                if (backpack != null && slot.Itemstack != null)
+                {
+                    AddSlots(backpack, slot.Itemstack, slotForBackpack);
+                }
+            }
         }
     }
     public override void DiscardAll()
@@ -232,11 +288,16 @@ public class BackpackInventory : InventoryPlayerBackpacks
             for (int slotIndex = 0; slotIndex < SlotsSystem.DefaultVanillaSlotsOrder.Count; slotIndex++)
             {
                 ItemStack? itemStack = PreviousVanillaSerializedData.GetItemstack(slotIndex.ToString());
-                if (SlotsByIndex[slotIndex] is ItemSlotBackpack)
+                if (SlotsByIndex[slotIndex] is SlotForVanillaBackpack slotForBackpack)
                 {
                     SlotsByIndex[slotIndex].Itemstack = itemStack;
+                    PreviousBackpackStacks[slotForBackpack.SlotId] = itemStack;
                 }
             }
+        }
+        else
+        {
+
         }
 
         PreviousSerializedData = slotsTree;
@@ -346,6 +407,7 @@ public class BackpackInventory : InventoryPlayerBackpacks
     protected readonly int SlotsForBackpacksCount;
     protected int VanillaSlotsCount = 4;
     protected const string SlotsDataAttributeName = "plrinvlib:slots";
+    protected readonly Dictionary<string, ItemStack?> PreviousBackpackStacks = [];
 
 
     protected virtual int AddSlot(ItemSlot slot)

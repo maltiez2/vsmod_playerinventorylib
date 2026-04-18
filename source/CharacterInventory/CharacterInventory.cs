@@ -7,7 +7,7 @@ using Vintagestory.Common;
 namespace PlayerInventoryLib;
 
 
-public class CharacterInventory : InventoryCharacter
+public class CharacterInventory : InventoryCharacter, IPlayerInventory
 {
     public CharacterInventory(string className, string playerUID, ICoreAPI api) : base(className, playerUID, api)
     {
@@ -106,6 +106,10 @@ public class CharacterInventory : InventoryCharacter
         tree.SetInt("version", CurrentImplementationVersion);
     }
 
+    public virtual void BeforeSlotModified(ItemSlot slot, ref ItemStackMoveOperation op)
+    {
+
+    }
     public override void OnItemSlotModified(ItemSlot slot)
     {
         foreach ((string id, ItemSlot existingSlot) in SlotsById)

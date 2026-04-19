@@ -12,16 +12,14 @@ public sealed class ObjectCache<TKey, TValue> : IDisposable
     private ICoreAPI? _api;
     private readonly int _cleanUpPeriodMs;
     private readonly long _cleanUpTimer = 0;
-    private readonly int _cleanUpThreshold;
     private readonly string _loggedCacheName;
     private readonly bool _threadSafe;
     private long _addCountBetweenCleanUps = 0;
     private long _getCountBetweenCleanUps = 0;
 
-    public ObjectCache(ICoreAPI api, string loggedCacheName = "cache", int cleanUpThreshold = 100, int cleanUpPeriod = 10 * 60 * 1000, bool threadSafe = true)
+    public ObjectCache(ICoreAPI api, string loggedCacheName = "cache", int cleanUpPeriod = 10 * 60 * 1000, bool threadSafe = true)
     {
         _api = api;
-        _cleanUpThreshold = cleanUpThreshold;
         _cleanUpPeriodMs = cleanUpPeriod;
         _loggedCacheName = loggedCacheName;
         _threadSafe = threadSafe;

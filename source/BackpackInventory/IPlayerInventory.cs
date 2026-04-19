@@ -6,4 +6,5 @@ public interface IPlayerInventory : IOwnedInventory
 {
     void BeforeTakeOutWhole(ItemSlot slot);
     void OnItemSlotModified(ItemSlot slot);
+    string PlayerUID { get; }
 }

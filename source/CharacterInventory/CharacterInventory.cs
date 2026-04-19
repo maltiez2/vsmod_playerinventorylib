@@ -51,7 +51,7 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
 
     public event Action<CharacterInventory, ItemSlot, string, int>? OnSlotModified;
 
-    public string OwnerUid => playerUID;
+    public string PlayerUID => playerUID;
 
 
     public virtual ItemSlot GetSlot(string id) => SlotsById[id];
@@ -63,7 +63,7 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
 
         ITreeAttribute slotsTree = tree.GetTreeAttribute(SlotsDataAttributeName) ?? new TreeAttribute();
 
-        int version = slotsTree.GetInt("version");
+        int version = tree.GetInt("version");
         if (version < CurrentImplementationVersion)
         {
             // process version changes

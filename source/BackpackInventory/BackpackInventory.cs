@@ -1,5 +1,6 @@
 ﻿using PlayerInventoryLib.Utils;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
@@ -14,14 +15,20 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
     public BackpackInventory(string className, string playerUID, ICoreAPI api) : base(className, playerUID, api)
     {
         SlotsSystem = api.ModLoader.GetModSystem<CharacterSlotsSystem>() ?? throw new InvalidOperationException("Unable to find CharacterSlotsSystem");
-        PlaceholderSlot = new(playerUID, "placeholder", this);
+        PlaceholderSlot = new(playerUID, "placeholder", this)
+        {
+            HexBackgroundColor = "#999999"
+        };
         SlotsForBackpacksCount = SlotsSystem.BackpackSlotsCount;
         GenerateSlotsForVanillaBackpacks();
     }
     public BackpackInventory(string inventoryId, ICoreAPI api) : base(inventoryId, api)
     {
         SlotsSystem = api.ModLoader.GetModSystem<CharacterSlotsSystem>() ?? throw new InvalidOperationException("Unable to find CharacterSlotsSystem");
-        PlaceholderSlot = new(playerUID, "placeholder", this);
+        PlaceholderSlot = new(playerUID, "placeholder", this)
+        {
+            HexBackgroundColor = "#999999"
+        };
         SlotsForBackpacksCount = SlotsSystem.BackpackSlotsCount;
         GenerateSlotsForVanillaBackpacks();
     }
@@ -59,6 +66,16 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         {
             RemoveSlots(backpack, slot.Itemstack, slotForBackpack);
         }
+
+        IHeldBag? bag = slotForBackpack.Itemstack?.Collectible?.GetCollectibleInterface<IHeldBag>();
+        if (bag != null && slotForBackpack.Itemstack != null)
+        {
+            string backpackId = $"{slotForBackpack.SlotId}@vanilla";
+            if (SlotsByBackpackSlotId.ContainsKey(backpackId))
+            {
+                RemoveHeldBagSlots(bag, slotForBackpack);
+            }
+        }
     }
     public override void OnItemSlotModified(ItemSlot slot)
     {
@@ -68,23 +85,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         }
         else if (slot is SlotForVanillaBackpack slotForBackpack)
         {
-            IBackpack? backpack = slot.Itemstack?.Collectible?.GetCollectibleInterface<IBackpack>();
-            if (backpack != null && slot.Itemstack != null)
-            {
-                string backpackId = $"{slotForBackpack.SlotId}@{backpack.BackpackId}";
-                if (SlotsByBackpackSlotId.ContainsKey(backpackId))
-                {
-                    if (backpack.RequiresSlotsReload(slotForBackpack))
-                    {
-                        RemoveSlots(backpack, null, slotForBackpack);
-                        AddSlots(backpack, slot.Itemstack, slotForBackpack);
-                    }
-                }
-                else
-                {
-                    AddSlots(backpack, slot.Itemstack, slotForBackpack);
-                }
-            }
+            OnVanillaBackpackSlotModified(slotForBackpack);
         }
     }
     public override void DiscardAll()
@@ -161,7 +162,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         ITreeAttribute slotsTree = tree.GetTreeAttribute(SlotsDataAttributeName) ?? new TreeAttribute();
         PreviousSerializedData = slotsTree;
 
-        int version = slotsTree.GetInt("version");
+        int version = tree.GetInt("version");
         if (version < CurrentImplementationVersion)
         {
             // process version changes
@@ -174,26 +175,12 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
             DeserializedSlotsContent.Add(slotId, itemStack);
         }
 
-        for (int slotIndex = 0; slotIndex < SlotsForBackpacksCount; slotIndex++)
-        {
-            string slotId = $"self{slotIndex}";
-            if (DeserializedSlotsContent.TryGetValue(slotId, out ItemStack? itemStack))
-            {
-                PreviousBackpackStacks[slotId] = itemStack;
-            }
-            else
-            {
-                PreviousBackpackStacks[slotId] = null;
-            }
-        }
-
         if (version == 0) // Vanilla
         {
             for (int slotIndex = 0; slotIndex < SlotsForBackpacksCount; slotIndex++)
             {
                 ItemStack? itemStack = PreviousVanillaSerializedData.GetItemstack(slotIndex.ToString());
                 DeserializedSlotsContent[$"self{slotIndex}"] = itemStack;
-                PreviousBackpackStacks[$"self{slotIndex}"] = itemStack;
             }
         }
 
@@ -244,7 +231,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
                 LoggerUtil.Error(Api, this, $"Trying to add backpack slots from '{backpackStack.Collectible?.Code}' but supplied slot with id '{slotId}' is not 'IBackpackSlot'");
                 continue;
             }
-            
+
             string backpackSlotId = $"{backpackId}@{slotId}";
 
             SlotsBySlotId[backpackSlotId] = slot;
@@ -312,37 +299,16 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
 
     public override float GetSuitability(ItemSlot sourceSlot, ItemSlot targetSlot, bool isMerge)
     {
-        float multiplier = (sourceSlot.Itemstack.Collectible.GetStorageFlags(sourceSlot.Itemstack) & EnumItemStorageFlags.Backpack) > 0 ? 2 : 1;
-
-        // It feels more intuitive to not move stuff into the backpack inventory if it's closed
-        // but we test if its a DummySlot, because stuff collected from the ground should still go into the backpack inv
-        if (targetSlot is ItemSlotBagContent && !openedByPlayerGUIds.Contains(playerUID) && !(sourceSlot is DummySlot))
+        if (targetSlot is IBackpackSlot playerSlot)
         {
-            multiplier *= 0.35f;
+            return base.GetSuitability(sourceSlot, targetSlot, isMerge) + playerSlot.BackpackSlotConfig.Priority;
         }
-
-        if (targetSlot is ItemSlotBagContent)
+        else
         {
-            bool singleFlag = (targetSlot.StorageType & (targetSlot.StorageType - 1)) == 0;
-            if (singleFlag && (targetSlot.StorageType & sourceSlot.Itemstack.Collectible.GetStorageFlags(sourceSlot.Itemstack)) > 0)
-            {
-                multiplier *= 1.2f;
-            }
+            return base.GetSuitability(sourceSlot, targetSlot, isMerge);
         }
-
-        return
-            (base.GetSuitability(sourceSlot, targetSlot, isMerge)
-            + ((sourceSlot.Inventory is InventoryGeneric && sourceSlot.Itemstack?.Collectible.GetTool(sourceSlot) == null) ? 1 : 0)) * multiplier
-            + ((sourceSlot is ItemSlotOutput || sourceSlot is ItemSlotCraftingOutput) ? 1 : 0)
-        ;
     }
 
-    public virtual float GetSuitability(ItemSlot sourceSlot, ItemSlot targetSlot, bool isMerge)
-    {
-        float extraWeight = targetSlot is ItemSlotBackpack && (sourceSlot.Itemstack.Collectible.GetStorageFlags(sourceSlot.Itemstack) & EnumItemStorageFlags.Backpack) > 0 ? 2 : 0;
-
-        return baseWeight + extraWeight + (isMerge ? 3 : 1);
-    }
 
 
     protected const int CurrentImplementationVersion = 1;
@@ -427,6 +393,60 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
             SlotForVanillaBackpack slotForBackpack = new(playerUID, $"self{slotIndex}", this);
             SlotsByIndex.Add(slotForBackpack);
             SlotsBySlotId.Add($"self{slotIndex}", slotForBackpack);
+        }
+    }
+
+    protected virtual bool AddHeldBagSlots(IHeldBag bag, SlotForVanillaBackpack slotForBackpack)
+    {
+        if (slotForBackpack.Itemstack == null)
+        {
+            return false;
+        }
+        
+        HeldBagBackpack bagBackpack = new("vanilla", bag, GetSlotId(slotForBackpack), this);
+
+        return AddSlots(bagBackpack, slotForBackpack.Itemstack, slotForBackpack);
+    }
+    protected virtual bool RemoveHeldBagSlots(IHeldBag bag, SlotForVanillaBackpack slotForBackpack)
+    {
+        if (slotForBackpack.Itemstack == null)
+        {
+            return false;
+        }
+
+        HeldBagBackpack bagBackpack = new("vanilla", bag, GetSlotId(slotForBackpack), this);
+
+        return RemoveSlots(bagBackpack, slotForBackpack.Itemstack, slotForBackpack);
+    }
+    protected virtual void OnVanillaBackpackSlotModified(SlotForVanillaBackpack slotForBackpack)
+    {
+        IBackpack? backpack = slotForBackpack.Itemstack?.Collectible?.GetCollectibleInterface<IBackpack>();
+        if (backpack != null && slotForBackpack.Itemstack != null)
+        {
+            string backpackId = $"{slotForBackpack.SlotId}@{backpack.BackpackId}";
+            if (SlotsByBackpackSlotId.ContainsKey(backpackId))
+            {
+                if (backpack.RequiresSlotsReload(slotForBackpack))
+                {
+                    RemoveSlots(backpack, null, slotForBackpack);
+                    AddSlots(backpack, slotForBackpack.Itemstack, slotForBackpack);
+                }
+            }
+            else
+            {
+                AddSlots(backpack, slotForBackpack.Itemstack, slotForBackpack);
+            }
+            return;
+        }
+
+        IHeldBag? bag = slotForBackpack.Itemstack?.Collectible?.GetCollectibleInterface<IHeldBag>();
+        if (bag != null && slotForBackpack.Itemstack != null)
+        {
+            string backpackId = $"{slotForBackpack.SlotId}@vanilla";
+            if (!SlotsByBackpackSlotId.ContainsKey(backpackId))
+            {
+                AddHeldBagSlots(bag, slotForBackpack);
+            }
         }
     }
 }

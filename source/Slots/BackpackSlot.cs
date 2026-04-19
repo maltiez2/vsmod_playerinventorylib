@@ -23,4 +23,22 @@ public class BackpackSlot : PlayerInventorySlot, IBackpackSlot
     public string BackpackSlotId { get; }
     public IBackpack Backpack { get; }
     public BackpackSlotConfig BackpackSlotConfig { get; }
+
+    public override bool CanTakeFrom(ItemSlot sourceSlot, EnumMergePriority priority = EnumMergePriority.AutoMerge) // From ItemSlotSurvival to restrict not empty held bags
+    {
+        IHeldBag? bag = sourceSlot.Itemstack?.Collectible.GetCollectibleInterface<IHeldBag>();
+
+        if (bag != null && !bag.IsEmpty(sourceSlot.Itemstack))
+        {
+            return false;
+        }
+        return base.CanTakeFrom(sourceSlot, priority);
+    }
+
+    public override bool CanHold(ItemSlot sourceSlot) // From ItemSlotSurvival to restrict not empty held bags
+    {
+        IHeldBag? bag = sourceSlot.Itemstack?.Collectible.GetCollectibleInterface<IHeldBag>();
+
+        return base.CanHold(sourceSlot) && (bag == null || bag.IsEmpty(sourceSlot.Itemstack)) && inventory.CanContain(this, sourceSlot);
+    }
 }

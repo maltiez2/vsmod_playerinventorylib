@@ -10,7 +10,7 @@ public interface IBackpack
     void StoreSlots(ItemStack stack, IPlayerInventorySlot slot, Dictionary<string, ItemSlot> slots);
     void OnBackpackSlotModified(IBackpackSlot backpackSlot);
     /// <summary>
-    /// If it is required to regenerate slots, when slot if modified.
+    /// If it is required to regenerate slots, when slot is modified.
     /// </summary>
     /// <param name="slotBackpackIsIn">Slot current backpack is in</param>
     /// <returns>if 'true', BackpackInventory.RemoveSlots and BackpackInventory.AddSlots will be called</returns>

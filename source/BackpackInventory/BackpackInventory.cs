@@ -346,7 +346,19 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
             if (SlotsByIndex[slotIndex] == slot)
             {
                 SlotsByIndex[slotIndex] = PlaceholderSlot;
-                return;
+                break;
+            }
+        }
+
+        for (int slotIndex = SlotsByIndex.Count - 1; slotIndex > 0; slotIndex--)
+        {
+            if (SlotsByIndex[slotIndex] != PlaceholderSlot)
+            {
+                if (slotIndex != SlotsByIndex.Count - 1)
+                {
+                    SlotsByIndex.RemoveRange(slotIndex + 1, SlotsByIndex.Count - slotIndex - 1);
+                }
+                break;
             }
         }
     }

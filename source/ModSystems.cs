@@ -1,4 +1,6 @@
-﻿using Vintagestory.API.Client;
+﻿using HarmonyLib;
+using PlayerInventoryLib.GUI;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.Client.NoObf;
@@ -11,6 +13,11 @@ public sealed class PlayerInventoryLibSystem : ModSystem
     public override void StartPre(ICoreAPI api)
     {
         HarmonyPatchesManager.Patch(api);
+
+        if (api is ICoreClientAPI clientApi)
+        {
+            ReplaceGuiDialog(clientApi.World as ClientMain ?? throw new Exception(), clientApi);
+        }
 
         _clientApi = api as ICoreClientAPI;
 
@@ -37,4 +44,19 @@ public sealed class PlayerInventoryLibSystem : ModSystem
 
 
     private ICoreClientAPI? _clientApi;
+
+    private void ReplaceGuiDialog(ClientMain client, ICoreClientAPI api)
+    {
+        List<GuiDialog> loadedGuis = AccessTools.FieldRefAccess<ClientMain, List<GuiDialog>>(AccessTools.Field(typeof(ClientMain), "LoadedGuis")).Invoke(client);
+
+        for (int i = 0; i < loadedGuis.Count; i++)
+        {
+            if (loadedGuis[i] is GuiDialogCharacter && loadedGuis[i].GetType() == typeof(GuiDialogCharacter))
+            {
+                loadedGuis[i].Dispose();
+                loadedGuis[i] = new CustomGuiDialogCharacter(api);
+                break;
+            }
+        }
+    }
 }

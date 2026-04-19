@@ -43,8 +43,6 @@ internal static class HarmonyPatchesManager
             return;
         }
         _patchedClientSide = true;
-
-        GuiDialogPatches.Patch(_harmonyIdGuiDialog, api);
     }
     private static void UnpatchClientSide()
     {
@@ -53,8 +51,6 @@ internal static class HarmonyPatchesManager
             return;
         }
         _patchedClientSide = false;
-
-        GuiDialogPatches.Unpatch(_harmonyIdGuiDialog);
     }
 
     private static void PatchUniversalSide(ICoreAPI api)

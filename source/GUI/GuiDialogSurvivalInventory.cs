@@ -1,7 +1,10 @@
-﻿using Vintagestory.API.Client;
+﻿using System.Collections.Generic;
+using System.Diagnostics;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.Client.NoObf;
+using static OpenTK.Graphics.OpenGL.GL;
 
 namespace PlayerInventoryLib.GUI;
 
@@ -11,6 +14,7 @@ public class GuiDialogSurvivalInventory : GuiDialog
     public GuiDialogSurvivalInventory(ICoreClientAPI capi) : base(capi)
     {
         (capi.World as ClientMain)?.eventManager.OnPlayerModeChange.Add(this.OnPlayerModeChanged);
+        _api = capi;
     }
 
 
@@ -41,10 +45,23 @@ public class GuiDialogSurvivalInventory : GuiDialog
             _backpackInv.SlotModified += BackpackInv_SlotModified;
         }
 
-        if (capi.World.Player.WorldData.CurrentGameMode == EnumGameMode.Guest || capi.World.Player.WorldData.CurrentGameMode == EnumGameMode.Survival)
+        if (capi.World.Player.WorldData.CurrentGameMode != EnumGameMode.Spectator)
         {
-            ComposeSurvivalInvDialog();
-            Composers["maininventory"] = _survivalInvDialog;
+            try
+            {
+                ComposeSurvivalInvDialog();
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine(exception);
+                return;
+            }
+
+            if (_composer != null)
+            {
+                Composers["maininventory_survival"] = _composer;
+            }
+            
         }
 
         if (firstBuild)
@@ -53,14 +70,6 @@ public class GuiDialogSurvivalInventory : GuiDialog
         }
     }
 
-    public override bool TryOpen()
-    {
-        EnumGameMode currentGameMode = capi.World.Player.WorldData.CurrentGameMode;
-
-        if (currentGameMode != EnumGameMode.Creative) return false;
-
-        return base.TryOpen();
-    }
 
     public override void OnGuiOpened()
     {
@@ -105,14 +114,14 @@ public class GuiDialogSurvivalInventory : GuiDialog
                 capi.World.Player.InventoryManager.DropAllInventoryItems(_craftingInv);
 
                 capi.Network.SendPacketClient((Packet_Client)_craftingInv.Close(capi.World.Player));
-                _survivalInvDialog.GetSlotGrid("craftinggrid").OnGuiClosed(capi);
-                _survivalInvDialog.GetSlotGrid("outputslot").OnGuiClosed(capi);
+                _composer.GetSlotGrid("craftinggrid").OnGuiClosed(capi);
+                _composer.GetSlotGrid("outputslot").OnGuiClosed(capi);
             }
 
-            if (_survivalInvDialog != null)
+            if (_composer != null)
             {
                 capi.Network.SendPacketClient((Packet_Client)_backpackInv.Close(capi.World.Player));
-                _survivalInvDialog.GetSlotGridExcl("slotgrid").OnGuiClosed(capi);
+                _composer.GetSlotGridExcl("slotgrid").OnGuiClosed(capi);
             }
         }
     }
@@ -146,25 +155,31 @@ public class GuiDialogSurvivalInventory : GuiDialog
     {
         base.Dispose();
 
-        _survivalInvDialog?.Dispose();
+        _composer?.Dispose();
     }
 
 
 
     private IInventory? _backpackInv;
     private IInventory? _craftingInv;
-    private GuiComposer? _survivalInvDialog;
     private int _prevRows;
     private EnumGameMode _prevGameMode;
-
+    private readonly ICoreClientAPI _api;
+    private readonly List<int> _rows = [];
+    private GuiComposer? _composer;
 
     private void ComposeSurvivalInvDialog()
     {
+        if (_backpackInv == null || _craftingInv == null)
+        {
+            return;
+        }
+        
         double elemToDlgPad = GuiStyle.ElementToDialogPadding;
         double pad = GuiElementItemSlotGrid.unscaledSlotPadding;
         int rows = (int)Math.Ceiling(_backpackInv.Count / 6f);
-
         _prevRows = rows;
+
 
         // 1. The bounds of the slot grid itself. It is offseted by slot padding. It determines the size of the dialog, so we build the dialog from the bottom up
         ElementBounds slotGridBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, pad, pad, 6, 7).FixedGrow(2 * pad, 2 * pad);
@@ -191,7 +206,7 @@ public class GuiDialogSurvivalInventory : GuiDialog
             .ForkBoundingParent(elemToDlgPad, elemToDlgPad + 30, elemToDlgPad + gridBounds.fixedWidth + 20, elemToDlgPad)
         ;
 
-        if (capi.Settings.Bool["immersiveMouseMode"])
+        if (_api.Settings.Bool["immersiveMouseMode"])
         {
             dialogBounds
                 .WithAlignment(EnumDialogArea.RightMiddle)
@@ -211,44 +226,81 @@ public class GuiDialogSurvivalInventory : GuiDialog
         scrollBarBounds.fixedOffsetX -= 2;
         scrollBarBounds.fixedWidth = 15;
 
-        //if (survivalInvDialog != null) survivalInvDialog.Dispose();
+        GuiComposer composer = _api.Gui.CreateCompo("inventory-backpack", dialogBounds);
+        composer.AddShadedDialogBG(ElementBounds.Fill);
+        composer.AddDialogTitleBar(Lang.Get("Inventory and Crafting"), () => CloseIconPressed());
+        composer.AddVerticalScrollbar(OnNewScrollbarvalue, scrollBarBounds, "scrollbar");
 
-        _survivalInvDialog =
-            capi.Gui
-            .CreateCompo("inventory-backpack", dialogBounds)
-            .AddShadedDialogBG(ElementBounds.Fill)
-            .AddDialogTitleBar(Lang.Get("Inventory and Crafting"), CloseIconPressed)
-            .AddVerticalScrollbar(OnNewScrollbarvalue, scrollBarBounds, "scrollbar")
+        composer.AddInset(insetBounds, 3, 0.85f);
+        composer.BeginClip(clippingBounds);
+        ComposeBackpackSlots(composer, _backpackInv, fullGridBounds);
+        composer.EndClip();
 
-            .AddInset(insetBounds, 3, 0.85f)
-            .BeginClip(clippingBounds)
-            .AddItemSlotGridExcl(_backpackInv, SendInvPacket, 6, new int[] { 0, 1, 2, 3 }, fullGridBounds, "slotgrid")
-            .EndClip()
+        composer.AddItemSlotGrid(_craftingInv, (data) => SendInvPacket(data), 3, [0, 1, 2, 3, 4, 5, 6, 7, 8], gridBounds, "craftinggrid");
+        composer.AddItemSlotGrid(_craftingInv, (data) => SendInvPacket(data), 1, [9], outputBounds, "outputslot");
 
-            .AddItemSlotGrid(_craftingInv, SendInvPacket, 3, new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 }, gridBounds, "craftinggrid")
-            .AddItemSlotGrid(_craftingInv, SendInvPacket, 1, new int[] { 9 }, outputBounds, "outputslot")
+        try
+        {
+            composer.Compose();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine(ex);
+            return;
+        }
 
-            .Compose()
-        ;
-
-        _survivalInvDialog.GetScrollbar("scrollbar").SetHeights(
+        composer.GetScrollbar("scrollbar").SetHeights(
             (float)(slotGridBounds.fixedHeight),
-            (float)(fullGridBounds.fixedHeight + pad))
+            (float)(_rows.Select(rows => (rows + 0.4) * (GuiElementPassiveItemSlot.unscaledSlotSize + GuiElementItemSlotGrid.unscaledSlotPadding)).Sum()) - 12)
         ;
+
+        _composer = composer;
     }
 
-    private void BackpackInv_SlotModified(int t1)
+    private void OnNewScrollbarvalue(float value)
+    {
+        if (!IsOpened() || _composer == null)
+        {
+            return;
+        }
+
+        ElementBounds bounds = _composer.GetSlotGridExcl("slotgrid").Bounds;
+        bounds.fixedY = 10 - GuiElementItemSlotGrid.unscaledSlotPadding - value;
+        bounds.CalcWorldBounds();
+
+        int index = 0;
+        while (true)
+        {
+            try
+            {
+                if (_composer.GetElement($"slotgrid-{index}") == null) break;
+
+                ElementBounds bounds2 = _composer.GetSlotGridExcl($"slotgrid-{index}").Bounds;
+                ElementBounds bounds3 = _composer.GetRichtext($"category-{index}").Bounds;
+                bounds3.fixedY = bounds.fixedY + (GuiElementPassiveItemSlot.unscaledSlotSize + GuiElementItemSlotGrid.unscaledSlotPadding) * _rows[index];
+                bounds2.fixedY = bounds.fixedY + (GuiElementPassiveItemSlot.unscaledSlotSize + GuiElementItemSlotGrid.unscaledSlotPadding) * (_rows[index] + 0.4);
+                bounds2.CalcWorldBounds();
+                bounds3.CalcWorldBounds();
+                bounds = bounds2;
+                index++;
+            }
+            catch
+            {
+                break;
+            }
+        }
+    }
+
+    private void BackpackInv_SlotModified(int slotIndex)
     {
         int rows = (int)Math.Ceiling(_backpackInv.Count / 6f);
-        if (rows != _prevRows)
-        {
-            ComposeSurvivalInvDialog();
-            Composers.Remove("maininventory");
 
-            if (capi.World.Player.WorldData.CurrentGameMode == EnumGameMode.Guest || capi.World.Player.WorldData.CurrentGameMode == EnumGameMode.Survival)
-            {
-                Composers["maininventory"] = _survivalInvDialog;
-            }
+        ComposeSurvivalInvDialog();
+        Composers.Remove("maininventory_survival");
+
+        if (capi.World.Player.WorldData.CurrentGameMode != EnumGameMode.Spectator && _composer != null)
+        {
+            Composers["maininventory_survival"] = _composer;
         }
     }
 
@@ -262,19 +314,6 @@ public class GuiDialogSurvivalInventory : GuiDialog
         TryClose();
     }
 
-    private void OnNewScrollbarvalue(float value)
-    {
-        if (!IsOpened()) return;
-
-        if (capi.World.Player.WorldData.CurrentGameMode == EnumGameMode.Survival && _survivalInvDialog != null)
-        {
-            ElementBounds bounds = _survivalInvDialog.GetSlotGridExcl("slotgrid").Bounds;
-            bounds.fixedY = 10 - GuiElementItemSlotGrid.unscaledSlotPadding - value;
-
-            bounds.CalcWorldBounds();
-        }
-    }
-
     private void OnPlayerModeChanged()
     {
         // These 2 lines were flipped, causing unecessary lag
@@ -283,7 +322,7 @@ public class GuiDialogSurvivalInventory : GuiDialog
         // Only recompose if the mode actually changed
         if (_prevGameMode != capi.World.Player.WorldData.CurrentGameMode)
         {
-            Composers.Remove("maininventory");
+            Composers.Remove("maininventory_survival");
             ComposeGui(false);
             _prevGameMode = capi.World.Player.WorldData.CurrentGameMode;
 
@@ -299,11 +338,95 @@ public class GuiDialogSurvivalInventory : GuiDialog
         }
     }
 
-    /*internal override bool OnKeyCombinationToggle(KeyCombination viaKeyComb)
+    private void ComposeBackpackSlots(GuiComposer composer, IInventory? backPackInv, ElementBounds fullGridBounds)
     {
-        //if (!Composers.ContainsKey("maininventory")) return false;
-        if (IsOpened() && (_creativeInv != null && _creativeInvDialog != null && _creativeInvDialog.GetTextInput("searchbox")?.HasFocus == true)) return false;
+        if (backPackInv == null) return;
 
-        return base.OnKeyCombinationToggle(viaKeyComb);
-    }*/
+        _rows.Clear();
+
+        List<int> generalSlots = [];
+        List<(float order, string category, List<int> indexes)> specialSlots = [];
+
+        for (int slotIndex = 4; slotIndex < backPackInv.Count; slotIndex++)
+        {
+            ItemSlot? slot = backPackInv[slotIndex];
+
+            if (slot is PlaceholderItemSlot)
+            {
+                continue;
+            }
+
+            if (slot == null)
+            {
+                continue;
+            }
+
+            if (slot is IBackpackSlot slotWithCategory && slotWithCategory.BackpackSlotConfig.BackpackCategory != null)
+            {
+                bool categoryExists = false;
+                foreach ((float order, string category, List<int> indexes) in specialSlots)
+                {
+                    if (category == slotWithCategory.BackpackSlotConfig.BackpackCategory)
+                    {
+                        indexes.Add(slotIndex);
+                        categoryExists = true;
+                        break;
+                    }
+                }
+                if (!categoryExists)
+                {
+                    specialSlots.Add((slotWithCategory.BackpackSlotConfig.Priority, slotWithCategory.BackpackSlotConfig.BackpackCategory, [slotIndex]));
+                }
+            }
+            else
+            {
+                generalSlots.Add(slotIndex);
+            }
+        }
+
+        specialSlots.Sort((a, b) => Math.Sign(b.order - a.order));
+
+        ElementBounds generalGridBounds = fullGridBounds;
+
+        composer.AddItemSlotGridExcl(backPackInv, SendInvPacket, 6, GetInvertedIndexes(generalSlots, backPackInv.Count), generalGridBounds, "slotgrid");
+
+        _rows.Add((int)Math.Ceiling(generalSlots.Count / 6f));
+
+        ElementBounds specialGridBounds = fullGridBounds.FlatCopy();
+        for (int categoryIndex = 0; categoryIndex < specialSlots.Count; categoryIndex++)
+        {
+            _rows.Add((int)Math.Ceiling(specialSlots[categoryIndex].indexes.Count / 6f));
+
+            double Y = specialGridBounds.fixedY + (GuiElementPassiveItemSlot.unscaledSlotSize + GuiElementItemSlotGrid.unscaledSlotPadding) * _rows[categoryIndex];
+
+            specialGridBounds = fullGridBounds.FlatCopy();
+            specialGridBounds.fixedY = Y;
+
+            composer.AddRichtext(Lang.Get($"slotcategory-{specialSlots[categoryIndex].category}"), CairoFont.WhiteSmallText().WithFontSize(14), specialGridBounds, $"category-{categoryIndex}");
+
+            specialGridBounds = fullGridBounds.FlatCopy();
+            specialGridBounds.fixedY = Y + (GuiElementPassiveItemSlot.unscaledSlotSize + GuiElementItemSlotGrid.unscaledSlotPadding) * 0.4;
+
+            composer.AddItemSlotGridExcl(
+                backPackInv,
+                SendInvPacket,
+                6,
+                GetInvertedIndexes(specialSlots[categoryIndex].indexes, backPackInv.Count),
+                specialGridBounds,
+                $"slotgrid-{categoryIndex}");
+        }
+    }
+    
+    private static int[] GetInvertedIndexes(List<int> indexes, int total)
+    {
+        List<int> result = [];
+        for (int index = 0; index < total; index++)
+        {
+            if (!indexes.Contains(index))
+            {
+                result.Add(index);
+            }
+        }
+        return result.ToArray();
+    }
 }

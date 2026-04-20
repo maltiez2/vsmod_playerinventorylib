@@ -55,8 +55,12 @@ public sealed class PlayerInventoryLibSystem : ModSystem
             {
                 loadedGuis[i].Dispose();
                 loadedGuis[i] = new CustomGuiDialogCharacter(api);
-                break;
             }
         }
+
+        client.RegisterDialog(new GuiDialogCreativeInventory(api));
+        client.RegisterDialog(new GuiDialogSurvivalInventory(api));
+
+        api.Input.RegisterHotKey("inventorydialog-creative", Lang.Get("Open Creative Inventory"), GlKeys.E, HotkeyType.CharacterControls, shiftPressed: true);
     }
 }

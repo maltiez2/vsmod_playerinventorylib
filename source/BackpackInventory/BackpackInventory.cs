@@ -37,7 +37,11 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
     {
         get
         {
-            return SlotsByIndex[slotId];
+            if (slotId < SlotsByIndex.Count)
+            {
+                return SlotsByIndex[slotId];
+            }
+            return PlaceholderSlot;
         }
         set
         {

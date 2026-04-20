@@ -21,7 +21,7 @@ public class GuiDialogCreativeInventory : GuiDialog
 
     public override double DrawOrder => 0.2; // Needs to be same as chest container guis so it can be on top of those dialogs if necessary
 
-    public override string ToggleKeyCombinationCode => "inventorydialog";
+    public override string ToggleKeyCombinationCode => "inventorydialog-creative";
 
     public override float ZSize => 250;
 

@@ -21,6 +21,7 @@ public class BackpackSlot : PlayerInventorySlot, IBackpackSlot
 
     public int SlotIndex { get; set; }
     public string BackpackSlotId { get; }
+    public string? FullSlotId { get; set; }
     public IBackpack Backpack { get; }
     public BackpackSlotConfig BackpackSlotConfig { get; }
 

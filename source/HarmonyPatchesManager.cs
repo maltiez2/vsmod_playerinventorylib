@@ -61,7 +61,7 @@ internal static class HarmonyPatchesManager
         }
         _patchedUniversalSide = true;
 
-        //new Harmony(_harmonyIdTranspilers).PatchAll();
+        new Harmony(_harmonyIdTranspilers).PatchAll();
     }
     private static void UnpatchUniversalSide()
     {
@@ -71,6 +71,6 @@ internal static class HarmonyPatchesManager
         }
         _patchedUniversalSide = false;
 
-       //new Harmony(_harmonyIdTranspilers).UnpatchAll();
+       new Harmony(_harmonyIdTranspilers).UnpatchAll();
     }
 }

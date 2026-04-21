@@ -17,8 +17,6 @@ public class VanillaBagContentSlot : ItemSlotBagContent, IBackpackSlot
 
     public ItemSlotBagContent OriginalSlot { get; set; }
 
-    int IBackpackSlot.SlotIndex { get; set; }
-
     public string BackpackSlotId { get; set; }
 
     public IBackpack Backpack { get; set; }
@@ -32,4 +30,6 @@ public class VanillaBagContentSlot : ItemSlotBagContent, IBackpackSlot
     public string SlotId { get; set; }
 
     public ComplexTagCondition<TagSet>? Tags { get; set; }
+
+    public string? FullSlotId { get; set; }
 }

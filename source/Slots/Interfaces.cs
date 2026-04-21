@@ -36,8 +36,8 @@ public interface IPlayerInventorySlot
 
 public interface IBackpackSlot : IPlayerInventorySlot
 {
-    int SlotIndex { get; set; }
     string BackpackSlotId { get; }
     IBackpack Backpack { get; }
     BackpackSlotConfig BackpackSlotConfig { get; }
+    public string? FullSlotId { get; set; }
 }

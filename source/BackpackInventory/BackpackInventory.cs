@@ -192,7 +192,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
             string stackName = sourceSlot.Itemstack?.GetName();
             string sourceInv = sourceSlot.Inventory?.InventoryID;
 
-            StringBuilder shiftClickDebugText = new StringBuilder();
+            StringBuilder shiftClickDebugText = new();
 
             op.RequestedQuantity = sourceSlot.StackSize;
             op.ActingPlayer.InventoryManager.TryTransferAway(sourceSlot, ref op, false, shiftClickDebugText);
@@ -302,10 +302,11 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
             }
 
             string backpackSlotId = GetSlotFullId(backpack.BackpackId, slotForBackpack.SlotId, backpackSlot.SlotId);
+            backpackSlot.FullSlotId = backpackSlotId;
 
             SlotsBySlotId[backpackSlotId] = slot;
             SlotsByBackpackSlotId[backpackId].Add(slotId, slot);
-            backpackSlot.SlotIndex = AddSlot(slot);
+            AddSlot(slot);
 
             if (setFromDeserialized && DeserializedSlotsContent.TryGetValue(backpackSlotId, out ItemStack? backpackSlotStack))
             {
@@ -363,6 +364,14 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
     public virtual ItemSlot GetSlotByBackpackSlotId(string backpackSlotId)
     {
         return SlotsBySlotId[backpackSlotId];
+    }
+    public virtual bool GetSlotByBackpackSlotId(string backpackSlotId, [NotNullWhen(true)] out ItemSlot? slot)
+    {
+        return SlotsBySlotId.TryGetValue(backpackSlotId, out slot);
+    }
+    public virtual void SetDeserializedSlotContent(string backpackSlotId, ItemStack? content)
+    {
+        DeserializedSlotsContent[backpackSlotId] = content;
     }
 
     public override float GetSuitability(ItemSlot sourceSlot, ItemSlot targetSlot, bool isMerge)
@@ -446,7 +455,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         for (int slotBackpackIsInIndex = 0; slotBackpackIsInIndex < SlotsForBackpacksCount; slotBackpackIsInIndex++)
         {
             ItemSlot slotByIndex = SlotsByIndex[slotBackpackIsInIndex];
-            
+
             if (slotByIndex is not SlotForVanillaBackpack slotForBackpack) continue;
 
             if (DeserializedSlotsContent.TryGetValue(slotForBackpack.SlotId, out ItemStack? stack))
@@ -488,7 +497,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         {
             return false;
         }
-        
+
         HeldBagBackpack bagBackpack = new("vanilla", bag, GetSlotId(slotForBackpack), this);
 
         return AddSlots(bagBackpack, slotForBackpack.Itemstack, slotForBackpack);

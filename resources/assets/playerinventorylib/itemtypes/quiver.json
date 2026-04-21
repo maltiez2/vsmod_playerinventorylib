@@ -1,0 +1,18 @@
+﻿{
+  "code": "quiver",
+  "tags": ["slot-shoulder"],
+  "maxstacksize": 1,
+  "attributes": { "attachableToEntity": { "categoryCode": "backpack", "attachedShape": { "base": "game:item/bag/quiver-attached" } }, "wearableAttachment": true },
+  "behaviors": [
+    {
+      "name": "PlayerInventoryLib:BackpackBehavior",
+      "properties": { "slotGroups": { "arrows": { "number": 3, "priority": 1, "backpackCategory": "Ammo", "backpackCategoryPriority": 1, "color": "#CC9999" } } }
+    },
+    { "name": "PlayerInventoryLib:EnableSlotsBehavior", "properties": { "slotsToEnable": ["ArmorHead", "ArmorBody", "ArmorLegs"], "ConfigOverride": { "ArmorHead": { "Icon": null } } } }
+  ],
+  "shape": { "base": "game:item/bag/quiver" },
+  "creativeinventory": { "playerinventorylib": ["*"] },
+  "guiTransform": { "translation": { "x": 0, "y": 0, "z": 0 }, "rotation": { "x": -47, "y": 1, "z": -17 }, "origin": { "x": "0.5", "y": 0, "z": "0.5" }, "scale": "2.54", "rotate": true },
+  "tpHandTransform": { "translation": { "x": "-0.6", "y": 0, "z": "-0.4" }, "rotation": { "x": -77, "y": -37, "z": 22 }, "origin": { "x": "0.5", "y": 0, "z": "0.5" }, "scale": "1.07" },
+  "groundTransform": { "translation": { "x": 0, "y": 0, "z": 0 }, "rotation": { "x": 180, "y": 33, "z": -180 }, "origin": { "x": "0.5", "y": 0, "z": "0.5" }, "scale": "4.5" }
+}

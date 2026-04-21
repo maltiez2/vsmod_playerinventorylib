@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using PlayerInventoryLib.Backpacks;
 using PlayerInventoryLib.GUI;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -27,12 +28,17 @@ public sealed class PlayerInventoryLibSystem : ModSystem
         (api as ServerCoreAPI)?.ClassRegistryNative.RegisterInventoryClass(GlobalConstants.backpackInvClassName, typeof(BackpackInventory));
         (api as ClientCoreAPI)?.ClassRegistryNative.RegisterInventoryClass(GlobalConstants.backpackInvClassName, typeof(BackpackInventory));
     }
-
+    public override void Start(ICoreAPI api)
+    {
+        api.RegisterCollectibleBehaviorClass("PlayerInventoryLib:BackpackBehavior", typeof(BackpackBehavior));
+        api.RegisterCollectibleBehaviorClass("PlayerInventoryLib:EnableSlotsBehavior", typeof(EnableSlotsBehavior));
+    }
     public override void Dispose()
     {
         HarmonyPatchesManager.Unpatch();
     }
 
+    
     public void RegisterSlotIcon(AssetLocation path)
     {
         if (_clientApi == null)
@@ -43,9 +49,11 @@ public sealed class PlayerInventoryLibSystem : ModSystem
     }
 
 
+
     private ICoreClientAPI? _clientApi;
 
-    private void ReplaceGuiDialog(ClientMain client, ICoreClientAPI api)
+
+    private static void ReplaceGuiDialog(ClientMain client, ICoreClientAPI api)
     {
         List<GuiDialog> loadedGuis = AccessTools.FieldRefAccess<ClientMain, List<GuiDialog>>(AccessTools.Field(typeof(ClientMain), "LoadedGuis")).Invoke(client);
 

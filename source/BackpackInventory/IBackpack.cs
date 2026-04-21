@@ -6,7 +6,7 @@ public interface IBackpack
 {
     string BackpackId { get; }
 
-    Dictionary<string, ItemSlot> GenerateSlots(ItemStack stack, IPlayerInventorySlot slotBackpackIsIn, string playerUid);
+    Dictionary<string, ItemSlot> GenerateSlots(ItemStack stack, IPlayerInventorySlot slotBackpackIsIn, string playerUid, InventoryBase inventory);
     void StoreSlots(ItemStack stack, IPlayerInventorySlot slot, Dictionary<string, ItemSlot> slots);
     void OnBackpackSlotModified(IBackpackSlot backpackSlot);
     /// <summary>

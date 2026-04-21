@@ -335,14 +335,27 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
             CharacterTabScrollAreaBounds.CalcWorldBounds();
         }
     }
+    protected virtual void OnRecomposeRequest()
+    {
+        SlotsSystem.RecalculateSlotsState(clientApi.World.Player);
+        if (CharacterTabSlotsState.CompareAndSetFrom(SlotsSystem.SlotsState))
+        {
+            ComposeGuis();
+        }
+    }
 
 
     protected override void ComposeGuis()
     {
         try
         {
-
             characterInv = capi.World.Player.InventoryManager.GetOwnInventory(GlobalConstants.characterInvClassName);
+
+            if (characterInv is CharacterInventory charInv)
+            {
+                charInv.OnGuiRecomposeRequest -= OnRecomposeRequest;
+                charInv.OnGuiRecomposeRequest += OnRecomposeRequest;
+            }
 
             BackgroundBounds = ElementBounds.Fill.WithFixedPadding(2);
 

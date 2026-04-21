@@ -3,7 +3,7 @@ using Vintagestory.API.Datastructures;
 
 namespace PlayerInventoryLib;
 
-public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlot
+public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlot, IConfigurableSlot
 {
     public PlayerInventorySlot(TagSet slotTag, string slotId, InventoryBase inventory, SlotConfig config, string playerUid) : base(inventory)
     {
@@ -23,7 +23,7 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
     public TagSet SlotIdTag { get; set; }
     public TagSet ExcludeTags { get; set; }
     public ComplexTagCondition<TagSet>? Tags { get; set; }
-    public SlotConfig Config { get; }
+    public SlotConfig Config { get; set; }
     public string PlayerUid { get; }
 
     public override EnumItemStorageFlags StorageType => EnumItemStorageFlags.General | EnumItemStorageFlags.Agriculture | EnumItemStorageFlags.Alchemy | EnumItemStorageFlags.Jewellery | EnumItemStorageFlags.Metallurgy | EnumItemStorageFlags.Outfit;
@@ -69,6 +69,27 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
         return base.CanHold(sourceSlot);
     }
 
+    public SlotConfig GetConfig() => Config;
+    public void OverrideConfig(SlotConfig config)
+    {
+        ConfigBackup ??= Config;
+
+        Config = config;
+        Tags = config.Tags;
+        HexBackgroundColor = config.Color;
+        BackgroundIcon = config.Icon;
+    }
+    public void ResetConfig()
+    {
+        if (ConfigBackup == null) return;
+
+        Config = ConfigBackup;
+        Tags = Config.Tags;
+        HexBackgroundColor = Config.Color;
+        BackgroundIcon = Config.Icon;
+        ConfigBackup = null;
+    }
+
     public override ItemStack TakeOutWhole()
     {
         if (inventory is IPlayerInventory playerInventory)
@@ -77,5 +98,41 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
         }
 
         return base.TakeOutWhole();
+    }
+
+    public override bool TryFlipWith(ItemSlot itemSlot)
+    {
+        if (itemSlot.StackSize > MaxSlotStackSize) return false;
+
+        bool canHoldHis = itemSlot.Empty || CanHold(itemSlot);
+        bool canIExchange = canHoldHis && (Empty || CanTake());
+
+        bool canHoldMine = Empty || itemSlot.CanHold(this);
+        bool canHeExchange = canHoldMine && (itemSlot.Empty || itemSlot.CanTake());
+
+        if (canIExchange && canHeExchange)
+        {
+            if (inventory is IPlayerInventory playerInventory)
+            {
+                playerInventory.BeforeTakeOutWhole(this);
+            }
+
+            return base.TryFlipWith(itemSlot);
+        }
+
+        return false;
+    }
+
+
+    protected SlotConfig? ConfigBackup;
+
+    protected override void FlipWith(ItemSlot withSlot)
+    {
+        if (inventory is IPlayerInventory playerInventory)
+        {
+            playerInventory.BeforeTakeOutWhole(this);
+        }
+
+        base.FlipWith(withSlot);
     }
 }

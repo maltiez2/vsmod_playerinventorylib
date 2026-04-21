@@ -1,6 +1,7 @@
 ﻿using PlayerInventoryLib.Utils;
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -48,7 +49,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
             throw new InvalidOperationException("BackpackInventory slots can not be set");
         }
     }
-    public override int Count => SlotsByIndex.Count;
+    public override int Count => SlotsByIndex.Count + 1;
     public override int CountForNetworkPacket => Count;
     public string PlayerUID => playerUID;
 
@@ -73,7 +74,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         IHeldBag? bag = slotForBackpack.Itemstack?.Collectible?.GetCollectibleInterface<IHeldBag>();
         if (bag != null && slotForBackpack.Itemstack != null)
         {
-            string backpackId = $"{slotForBackpack.SlotId}@vanilla";
+            string backpackId = GetBackpackFullId("vanilla", slotForBackpack.SlotId);
             if (SlotsByBackpackSlotId.ContainsKey(backpackId))
             {
                 RemoveHeldBagSlots(bag, slotForBackpack);
@@ -109,6 +110,31 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         }
 
         base.DiscardAll();
+    }
+    public virtual void DropSlot(ItemSlot slot)
+    {
+        if (slot is not SlotForVanillaBackpack slotForBackpack || slot.Itemstack == null)
+        {
+            return;
+        }
+
+        if (Player?.Entity?.Pos?.XYZ == null)
+        {
+            return;
+        }
+
+        Vec3d position = Player.Entity.Pos.XYZ;
+
+        IBackpack? backpack = slotForBackpack.Itemstack?.Collectible?.GetCollectibleInterface<IBackpack>();
+        if (backpack != null)
+        {
+            RemoveSlots(backpack, slot.Itemstack, slotForBackpack);
+        }
+
+        Api.World.SpawnItemEntity(slot.Itemstack, position);
+
+        slot.Itemstack = null;
+        slot.MarkDirty();
     }
     public override void DropAll(Vec3d pos, int maxStackSize = 0) // TODO: maxStackSize is ignored, may require fix
     {
@@ -155,6 +181,30 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
                 slotByIndex.MarkDirty();
             }
         }
+    }
+    public override object ActivateSlot(int slotId, ItemSlot sourceSlot, ref ItemStackMoveOperation op)
+    {
+        object packet = InvNetworkUtil.GetActivateSlotPacket(slotId, op);
+
+        if (op.ShiftDown)
+        {
+            sourceSlot = this[slotId];
+            string stackName = sourceSlot.Itemstack?.GetName();
+            string sourceInv = sourceSlot.Inventory?.InventoryID;
+
+            StringBuilder shiftClickDebugText = new StringBuilder();
+
+            op.RequestedQuantity = sourceSlot.StackSize;
+            op.ActingPlayer.InventoryManager.TryTransferAway(sourceSlot, ref op, false, shiftClickDebugText);
+
+            Api.World.Logger.Audit("{0} shift clicked slot {1} in {2}. Moved {3}x{4} to ({5})", op.ActingPlayer?.PlayerName, slotId, sourceInv, op.MovedQuantity, stackName, shiftClickDebugText.ToString());
+        }
+        else
+        {
+            this[slotId].ActivateSlot(sourceSlot, ref op);
+        }
+
+        return packet;
     }
 
     public override void FromTreeAttributes(ITreeAttribute tree)
@@ -216,9 +266,25 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
     }
 
 
-    public virtual bool AddSlots(IBackpack backpack, ItemStack backpackStack, IPlayerInventorySlot slotBackpackIsIn, bool setFromDeserialized = true)
+    public virtual bool TryAddOrUpdateSlots(IBackpack backpack, ItemStack backpackStack, IPlayerInventorySlot slotForBackpack, bool setFromDeserialized = true, bool storeSlots = true)
     {
-        string backpackId = $"{slotBackpackIsIn.SlotId}@{backpack.BackpackId}";
+        string backpackId = GetBackpackFullId(backpack.BackpackId, slotForBackpack.SlotId);
+        if (!SlotsByBackpackSlotId.ContainsKey(backpackId))
+        {
+            return AddSlots(backpack, backpackStack, slotForBackpack, setFromDeserialized);
+        }
+
+        if (backpack.RequiresSlotsReload(slotForBackpack))
+        {
+            RemoveSlots(backpack, backpackStack, slotForBackpack, storeSlots);
+            return AddSlots(backpack, backpackStack, slotForBackpack, setFromDeserialized);
+        }
+
+        return false;
+    }
+    public virtual bool AddSlots(IBackpack backpack, ItemStack backpackStack, IPlayerInventorySlot slotForBackpack, bool setFromDeserialized = true)
+    {
+        string backpackId = GetBackpackFullId(backpack.BackpackId, slotForBackpack.SlotId);
 
         if (SlotsByBackpackSlotId.ContainsKey(backpackId))
         {
@@ -226,7 +292,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         }
         SlotsByBackpackSlotId[backpackId] = [];
 
-        Dictionary<string, ItemSlot> backpackSlots = backpack.GenerateSlots(backpackStack, slotBackpackIsIn, playerUID);
+        Dictionary<string, ItemSlot> backpackSlots = backpack.GenerateSlots(backpackStack, slotForBackpack, playerUID, this);
         foreach ((string slotId, ItemSlot slot) in backpackSlots)
         {
             if (slot is not IBackpackSlot backpackSlot)
@@ -235,7 +301,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
                 continue;
             }
 
-            string backpackSlotId = $"{backpackId}@{slotId}";
+            string backpackSlotId = GetSlotFullId(backpack.BackpackId, slotForBackpack.SlotId, backpackSlot.SlotId);
 
             SlotsBySlotId[backpackSlotId] = slot;
             SlotsByBackpackSlotId[backpackId].Add(slotId, slot);
@@ -244,15 +310,14 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
             if (setFromDeserialized && DeserializedSlotsContent.TryGetValue(backpackSlotId, out ItemStack? backpackSlotStack))
             {
                 slot.Itemstack = backpackSlotStack;
-                DeserializedSlotsContent.Remove(backpackSlotId);
             }
         }
 
         return true;
     }
-    public virtual bool RemoveSlots(IBackpack backpack, ItemStack? backpackStack, IPlayerInventorySlot slotBackpackIsIn, bool storeSlots = true)
+    public virtual bool RemoveSlots(IBackpack backpack, ItemStack? backpackStack, IPlayerInventorySlot slotForBackpack, bool storeSlots = true)
     {
-        string backpackId = $"{slotBackpackIsIn.SlotId}@{backpack.BackpackId}";
+        string backpackId = GetBackpackFullId(backpack.BackpackId, slotForBackpack.SlotId);
 
         if (!SlotsByBackpackSlotId.TryGetValue(backpackId, out Dictionary<string, ItemSlot>? backpackSlots))
         {
@@ -275,16 +340,16 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
             RemoveSlot(backpackSlot);
         }
 
-        if (storeSlots && backpackStack != null)
+        if (storeSlots && backpackStack != null && Api.Side == EnumAppSide.Server)
         {
-            backpack.StoreSlots(backpackStack, slotBackpackIsIn, backpackSlots);
+            backpack.StoreSlots(backpackStack, slotForBackpack, backpackSlots);
         }
 
         return true;
     }
-    public virtual bool GetBackpackSlots(IBackpack backpack, PlayerInventorySlot slotBackpackIsIn, [NotNullWhen(true)] out IReadOnlyDictionary<string, ItemSlot>? backpackSlots)
+    public virtual bool GetBackpackSlots(IBackpack backpack, PlayerInventorySlot slotForBackpack, [NotNullWhen(true)] out IReadOnlyDictionary<string, ItemSlot>? backpackSlots)
     {
-        string backpackId = $"{slotBackpackIsIn.SlotId}@{backpack.BackpackId}";
+        string backpackId = GetBackpackFullId(backpack.BackpackId, slotForBackpack.SlotId);
 
         if (!SlotsByBackpackSlotId.TryGetValue(backpackId, out Dictionary<string, ItemSlot>? backpackSlotsValue))
         {
@@ -374,10 +439,6 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
                 bakpackSlot.Itemstack = deserializedStack;
                 DeserializedSlotsContent.Remove(backpackSlotId);
             }
-            else
-            {
-                bakpackSlot.Itemstack = null;
-            }
         }
     }
     protected virtual void UpdateSlotsForVanillaBackpackSlots()
@@ -385,20 +446,30 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         for (int slotBackpackIsInIndex = 0; slotBackpackIsInIndex < SlotsForBackpacksCount; slotBackpackIsInIndex++)
         {
             ItemSlot slotByIndex = SlotsByIndex[slotBackpackIsInIndex];
-            if (slotByIndex is not SlotForVanillaBackpack slotForBackpack || slotByIndex.Itemstack == null)
+            
+            if (slotByIndex is not SlotForVanillaBackpack slotForBackpack) continue;
+
+            if (DeserializedSlotsContent.TryGetValue(slotForBackpack.SlotId, out ItemStack? stack))
             {
-                continue;
+                slotByIndex.Itemstack = stack;
+                stack?.ResolveBlockOrItem(Api.World);
             }
+
+            if (slotByIndex.Itemstack == null) continue;
 
             IBackpack? backpack = slotForBackpack.Itemstack?.Collectible?.GetCollectibleInterface<IBackpack>();
-            if (backpack == null)
-            {
-                continue;
-            }
+            IHeldBag? bag = slotForBackpack.Itemstack?.Collectible?.GetCollectibleInterface<IHeldBag>();
 
-            RemoveSlots(backpack, slotByIndex.Itemstack, slotForBackpack, storeSlots: false);
-            AddSlots(backpack, slotByIndex.Itemstack, slotForBackpack, setFromDeserialized: false);
-            slotByIndex.MarkDirty();
+            if (backpack != null)
+            {
+                AddSlots(backpack, slotByIndex.Itemstack, slotForBackpack, setFromDeserialized: false);
+                slotByIndex.MarkDirty();
+            }
+            else if (bag != null)
+            {
+                AddHeldBagSlots(bag, slotForBackpack);
+                slotByIndex.MarkDirty();
+            }
         }
     }
     protected void GenerateSlotsForVanillaBackpacks()
@@ -438,7 +509,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         IBackpack? backpack = slotForBackpack.Itemstack?.Collectible?.GetCollectibleInterface<IBackpack>();
         if (backpack != null && slotForBackpack.Itemstack != null)
         {
-            string backpackId = $"{slotForBackpack.SlotId}@{backpack.BackpackId}";
+            string backpackId = GetBackpackFullId(backpack.BackpackId, slotForBackpack.SlotId);
             if (SlotsByBackpackSlotId.ContainsKey(backpackId))
             {
                 if (backpack.RequiresSlotsReload(slotForBackpack))
@@ -457,11 +528,15 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
         IHeldBag? bag = slotForBackpack.Itemstack?.Collectible?.GetCollectibleInterface<IHeldBag>();
         if (bag != null && slotForBackpack.Itemstack != null)
         {
-            string backpackId = $"{slotForBackpack.SlotId}@vanilla";
+            string backpackId = GetBackpackFullId("vanilla", slotForBackpack.SlotId);
             if (!SlotsByBackpackSlotId.ContainsKey(backpackId))
             {
                 AddHeldBagSlots(bag, slotForBackpack);
             }
         }
     }
+
+    protected static string GetBackpackFullId(string backpackId, string slotForBackpackId) => $"{backpackId}@{slotForBackpackId}";
+    protected static string GetSlotFullId(string backpackId, string slotForBackpackId, string slotId) => $"{backpackId}@{slotForBackpackId}@{slotId}";
+    protected static string GetSlotFullId(string backpackFullId, string slotId) => $"{backpackFullId}@{slotId}";
 }

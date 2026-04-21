@@ -12,7 +12,7 @@ public class PlaceholderItemSlot : ItemSlot, IPlayerInventorySlot
         SlotId = slotId;
     }
 
-    public bool Enabled => false;
+    public bool Enabled { get; set; } = false;
 
     public string PlayerUid { get; }
 

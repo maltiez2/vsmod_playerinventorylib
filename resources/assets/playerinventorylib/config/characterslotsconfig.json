@@ -1,0 +1,26 @@
+{
+  "VanillaSlots": {
+    "Head" : {"Priority": 0.01, "Disabled": false, "HiddenWhenDisabled": false },
+    "Shoulder" : {"Priority": 0.02, "Disabled": false, "HiddenWhenDisabled": false },
+    "UpperBody" : {"Priority": 0.03, "Disabled": false, "HiddenWhenDisabled": false },
+    "LowerBody" : {"Priority": 0.04, "Disabled": false, "HiddenWhenDisabled": false },
+    "Foot" : {"Priority": 0.05, "Disabled": false, "HiddenWhenDisabled": false },
+    "Hand" : {"Priority": 0.06, "Disabled": false, "HiddenWhenDisabled": false },
+    "Neck" : {"Priority": 0.07, "Disabled": false, "HiddenWhenDisabled": false },
+    "Emblem" : {"Priority": 0.08, "Disabled": false, "HiddenWhenDisabled": false },
+    "Face" : {"Priority": 0.09, "Disabled": false, "HiddenWhenDisabled": false },
+    "Waist" : {"Priority": 0.10, "Disabled": false, "HiddenWhenDisabled": false },
+    "Arm" : {"Priority": 0.11, "Disabled": false, "HiddenWhenDisabled": false },
+    "UpperBodyOver" : {"Priority": 0.12, "Disabled": false, "HiddenWhenDisabled": false },
+    "ArmorHead" : {"Priority": 0.13, "Disabled": true, "HiddenWhenDisabled": true, "Group": "playerinventorylib:armor" },
+    "ArmorBody" : {"Priority": 0.14, "Disabled": true, "HiddenWhenDisabled": true, "Group": "playerinventorylib:armor" },
+    "ArmorLegs" : {"Priority": 0.15, "Disabled": true, "HiddenWhenDisabled": true, "Group": "playerinventorylib:armor" }
+  },
+  "Groups": {
+    "armor": {
+      "Text": "Armor",
+      "HideWhenNoSlotsShown": true,
+      "Priority": 0
+    }
+  }
+}

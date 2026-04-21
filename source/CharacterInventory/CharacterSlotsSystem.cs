@@ -1,5 +1,6 @@
 ﻿using PlayerInventoryLib.Utils;
 using System.Collections.Immutable;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
@@ -11,8 +12,9 @@ public delegate ItemSlot CreateCharacterSlotDelegate(CharacterInventory inventor
 
 public interface IEnableSlots
 {
-    string[] GetSlotsToEnable();
-    Dictionary<string, CharacterSlotConfig> GetConfigOverrides();
+    string[] GetSlotsToEnable(ItemSlot inSlot);
+    Dictionary<string, SlotConfig> GetConfigOverrides(ItemSlot inSlot);
+    void OnBeforeTakenOut(ItemSlot fromSlot, List<ItemSlot> enabledSlots);
 }
 
 public class CharacterInventorySlotsState
@@ -68,12 +70,38 @@ public class CharacterSlotConfig : SlotConfig
     public bool HiddenWhenDisabled { get; set; } = true;
     public string? Group { get; set; }
     public string? DisabledColor { get; set; }
+    public float Priority { get; set; } = -1;
+
+    public CharacterSlotConfig()
+    {
+
+    }
+
+    public CharacterSlotConfig(CharacterSlotConfig previous, SlotConfig overrides)
+    {
+        Tags = overrides.Tags;
+        Icon = overrides.Icon;
+        Color = overrides.Color;
+        Disabled = previous.Disabled;
+        HiddenWhenDisabled = previous.HiddenWhenDisabled;
+        Group = previous.Group;
+        DisabledColor = previous.DisabledColor;
+        Priority = previous.Priority;
+    }
 }
 
 public class CharacterSlotGroupGuiConfig
 {
     public string Text { get; set; } = "";
     public bool HideWhenNoSlotsShown { get; set; } = true;
+    public float Priority { get; set; } = -1;
+}
+
+public class CharacterInventoryConfig
+{
+    public Dictionary<string, CharacterSlotConfig> VanillaSlots { get; set; } = [];
+    public Dictionary<string, CharacterSlotGroupGuiConfig> Groups { get; set; } = [];
+    public Dictionary<string, CharacterSlotConfig> Slots { get; set; } = [];
 }
 
 public class CharacterSlotsSystem : ModSystem
@@ -108,7 +136,7 @@ public class CharacterSlotsSystem : ModSystem
 
     public event Action? OnReady;
 
-    public override double ExecuteOrder() => 0.01;
+    public override double ExecuteOrder() => 0.1;
 
 
     public void RegisterSlotGroup(string groupId, CharacterSlotGroupGuiConfig config)
@@ -125,6 +153,10 @@ public class CharacterSlotsSystem : ModSystem
         _createSlotDelegates.Add(slotId, createSlotDelegate);
         _configs.Add(slotId, config);
     }
+    public void RegisterSlot(string slotId, CharacterSlotConfig config)
+    {
+        RegisterSlot(slotId, CreatePlayerInventorySlot, config);
+    }
     public void RegisterPlayerInventorySlot(string slotId, CharacterSlotConfig config)
     {
         if (_createSlotDelegates.ContainsKey(slotId))
@@ -135,10 +167,7 @@ public class CharacterSlotsSystem : ModSystem
         _createSlotDelegates.Add(slotId, CreatePlayerInventorySlot);
         _configs.Add(slotId, config);
     }
-    public void RegisterSlot(string slotId, CharacterSlotConfig config)
-    {
-        RegisterSlot(slotId, CreatePlayerInventorySlot, config);
-    }
+    
 
 
     public ItemSlot CreateSlot(string slotId, out int index, CharacterInventory inventory, ItemStack? stack, string playerUid)
@@ -223,16 +252,18 @@ public class CharacterSlotsSystem : ModSystem
     public override void StartPre(ICoreAPI api)
     {
         _api = api;
-        RegisterVanillaSlots();
     }
 
-    public override void Start(ICoreAPI api)
+    public override void AssetsLoaded(ICoreAPI api)
     {
+        CharacterInventoryConfig inventoryConfig = LoadInventoryConfigFromAssets(api);
+        ApplyInventoryConfig(inventoryConfig);
         ProcessSlots();
 
         if (api is ICoreServerAPI serverApi)
         {
             RegisterSlotTags(serverApi);
+            
             Ready = true;
             OnReady?.Invoke();
         }
@@ -240,16 +271,14 @@ public class CharacterSlotsSystem : ModSystem
 
     public override void AssetsFinalize(ICoreAPI api)
     {
-        if (api is ICoreServerAPI serverApi)
-        {
-            AddTagsToCollectibles(serverApi);
-        }
-        else
+        if (api is ICoreClientAPI)
         {
             CollectSlotTags(api);
             Ready = true;
             OnReady?.Invoke();
         }
+
+        AddTagsToCollectibles(api);
     }
 
 
@@ -257,7 +286,64 @@ public class CharacterSlotsSystem : ModSystem
     private readonly Dictionary<string, CreateCharacterSlotDelegate> _createSlotDelegates = [];
     private readonly Dictionary<string, CharacterSlotConfig> _configs = [];
     private readonly Dictionary<string, CharacterSlotGroupGuiConfig> _groupConfigs = [];
+    private const string _slotsConfigFile = "config/characterslotsconfig.json";
     private ICoreAPI? _api;
+
+
+    private void ApplyInventoryConfig(CharacterInventoryConfig config)
+    {
+        foreach ((string slotCode, CharacterSlotConfig slotConfig) in config.VanillaSlots)
+        {
+            RegisterSlot(slotCode, CreateClothesSlot, slotConfig);
+        }
+
+        foreach ((string slotCode, CharacterSlotConfig slotConfig) in config.Slots)
+        {
+            RegisterSlot(slotCode, CreatePlayerInventorySlot, slotConfig);
+        }
+
+        foreach ((string groupCode, CharacterSlotGroupGuiConfig groupConfig) in config.Groups)
+        {
+            RegisterSlotGroup(groupCode, groupConfig);
+        }
+    }
+
+    private CharacterInventoryConfig LoadInventoryConfigFromAssets(ICoreAPI api)
+    {
+        Dictionary<AssetLocation, CharacterInventoryConfig> inventoryConfigs = api.Assets.GetMany<CharacterInventoryConfig>(api.World.Logger, _slotsConfigFile);
+
+        CharacterInventoryConfig result = new();
+
+        foreach ((AssetLocation location, CharacterInventoryConfig config) in inventoryConfigs)
+        {
+            if (location.Domain == "playerinventorylib")
+            {
+                result.VanillaSlots = config.VanillaSlots;
+            }
+
+            foreach ((string groupCode, CharacterSlotGroupGuiConfig groupConfig) in config.Groups)
+            {
+                string groupCodeWithDomain = groupCode;
+                if (!groupCode.Contains(':'))
+                {
+                    groupCodeWithDomain = location.Domain + ":" + groupCode;
+                }
+                result.Groups[groupCodeWithDomain] = groupConfig;
+            }
+
+            foreach ((string slotCode, CharacterSlotConfig slotConfig) in config.Slots)
+            {
+                string slotCodeWithDomain = slotCode;
+                if (!slotCode.Contains(':'))
+                {
+                    slotCodeWithDomain = location.Domain + ":" + slotCode;
+                }
+                result.Slots[slotCodeWithDomain] = slotConfig;
+            }
+        }
+
+        return result;
+    }
 
     private void ProcessSlots()
     {
@@ -303,7 +389,7 @@ public class CharacterSlotsSystem : ModSystem
         SlotIdToTag = tags.ToImmutableDictionary();
     }
 
-    private void AddTagsToCollectibles(ICoreServerAPI api)
+    private void AddTagsToCollectibles(ICoreAPI api)
     {
         List<CollectibleObject> collectibles = api.World.Collectibles;
         foreach (CollectibleObject collectible in collectibles)
@@ -322,39 +408,6 @@ public class CharacterSlotsSystem : ModSystem
                 IEnumerable<string> slotTags = api.CollectibleTagRegistry.SlowEnumerateTagNames(slotTag);
                 collectible.Tags = api.CollectibleTagRegistry.CreateTagSet(collectibleTags.Concat(slotTags));
             }
-        }
-    }
-
-    private void RegisterVanillaSlots()
-    {
-        CharacterSlotGroupGuiConfig armorConfig = new()
-        {
-            Text = "Armor",
-        };
-
-        RegisterSlotGroup("armor", armorConfig);
-
-
-        foreach (string id in DefaultVanillaSlotsOrder)
-        {
-            CharacterSlotConfig config = id switch
-            {
-                "ArmorHead" => new()
-                {
-                    Group = "armor"
-                },
-                "ArmorBody" => new()
-                {
-                    Group = "armor"
-                },
-                "ArmorLegs" => new()
-                {
-                    Group = "armor"
-                },
-                _ => new()
-            };
-
-            RegisterSlot(id, CreateClothesSlot, config);
         }
     }
 

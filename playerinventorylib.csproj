@@ -59,9 +59,6 @@
   </PropertyGroup>
 
   <!-- Project item includes -->
-  <ItemGroup>
-    <Folder Include="resources\assets\playerinventorylib" />
-  </ItemGroup>
 
   <!-- Formatting JSON files -->
   <PropertyGroup>

@@ -17,9 +17,18 @@ public interface IClickableSlot
     event SlotClickedDelegate? OnSlotClicked;
 }
 
+public interface IConfigurableSlot
+{
+    SlotConfig GetConfig();
+
+    void OverrideConfig(SlotConfig config);
+
+    void ResetConfig();
+}
+
 public interface IPlayerInventorySlot
 {
-    bool Enabled { get; }
+    bool Enabled { get; set; }
     string PlayerUid { get; }
     string SlotId { get; }
     public ComplexTagCondition<TagSet>? Tags { get; }

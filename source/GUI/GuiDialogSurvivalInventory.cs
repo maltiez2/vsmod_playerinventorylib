@@ -39,10 +39,13 @@ public class GuiDialogSurvivalInventory : GuiDialog
         IPlayerInventoryManager invm = capi.World.Player.InventoryManager;
         _craftingInv = invm.GetOwnInventory(GlobalConstants.craftingInvClassName);
         _backpackInv = invm.GetOwnInventory(GlobalConstants.backpackInvClassName);
+        _characterInv = invm.GetOwnInventory(GlobalConstants.characterInvClassName);
+
 
         if (firstBuild)
         {
             _backpackInv.SlotModified += BackpackInv_SlotModified;
+            _characterInv.SlotModified += BackpackInv_SlotModified;
         }
 
         if (capi.World.Player.WorldData.CurrentGameMode != EnumGameMode.Spectator)
@@ -162,6 +165,7 @@ public class GuiDialogSurvivalInventory : GuiDialog
 
     private IInventory? _backpackInv;
     private IInventory? _craftingInv;
+    private IInventory? _characterInv;
     private int _prevRows;
     private EnumGameMode _prevGameMode;
     private readonly ICoreClientAPI _api;

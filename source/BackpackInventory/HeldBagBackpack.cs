@@ -20,9 +20,9 @@ public class HeldBagBackpack : IBackpack
     public int BagIndex { get; set; }
     public BackpackInventory BackpackInventory { get; set; }
 
-    public Dictionary<string, ItemSlot> GenerateSlots(ItemStack stack, IPlayerInventorySlot slotBackpackIsIn, string playerUid)
+    public Dictionary<string, ItemSlot> GenerateSlots(ItemStack stack, IPlayerInventorySlot slotBackpackIsIn, string playerUid, InventoryBase inventory)
     {
-        List<ItemSlotBagContent> slots = Bag.GetOrCreateSlots(stack, BackpackInventory, BagIndex, BackpackInventory.Api.World);
+        List<ItemSlotBagContent> slots = Bag.GetOrCreateSlots(stack, inventory, BagIndex, BackpackInventory.Api.World);
         Dictionary<string, ItemSlot> result = [];
         for (int slotIndex = 0; slotIndex < slots.Count; slotIndex++)
         {
@@ -47,7 +47,12 @@ public class HeldBagBackpack : IBackpack
             }
 
             vanillaBagSlot.OriginalSlot.Itemstack = vanillaBagSlot.Itemstack;
-            Bag.Store(stack, vanillaBagSlot.OriginalSlot);
+            Bag.Store(stack, vanillaBagSlot);
+
+            if (stack != vanillaBagSlot.Itemstack)
+            {
+                Debug.WriteLine($"({bagSlot.Inventory.Api.Side}: {BackpackId}@{slot.SlotId}) Stored from {id}: {vanillaBagSlot.Itemstack?.Collectible?.Code}");
+            }
         }
     }
 }

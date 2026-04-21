@@ -3,7 +3,7 @@ using Vintagestory.API.Datastructures;
 
 namespace PlayerInventoryLib;
 
-public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySlot
+public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySlot, IConfigurableSlot
 {
     public ClothesSlot(TagSet slotTag, string slotId, InventoryBase inventory, CharacterSlotConfig config, string playerUid, EnumCharacterDressType dressType) : base(dressType, inventory)
     {
@@ -11,6 +11,7 @@ public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySl
         SlotIdTag = slotTag;
         Config = config;
 
+        Enabled = !config.Disabled;
         Tags = config.Tags;
         HexBackgroundColor = config.Color;
         BackgroundIcon = config.Icon;
@@ -23,12 +24,12 @@ public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySl
     }
 
 
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; set; }
     public string SlotId { get; set; }
     public TagSet SlotIdTag { get; set; }
     public TagSet ExcludeTags { get; set; }
     public ComplexTagCondition<TagSet>? Tags { get; set; }
-    public CharacterSlotConfig Config { get; }
+    public CharacterSlotConfig Config { get; set; }
     public string PlayerUid { get; }
 
     public override EnumItemStorageFlags StorageType => EnumItemStorageFlags.General | EnumItemStorageFlags.Agriculture | EnumItemStorageFlags.Alchemy | EnumItemStorageFlags.Jewellery | EnumItemStorageFlags.Metallurgy | EnumItemStorageFlags.Outfit;
@@ -83,6 +84,32 @@ public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySl
         return base.TakeOutWhole();
     }
 
+    public SlotConfig GetConfig() => Config;
+    public void OverrideConfig(SlotConfig config)
+    {
+        CharacterSlotConfig characterConfig = new(Config, config);
+
+        ConfigBackup ??= Config;
+
+        Config = characterConfig;
+        Tags = characterConfig.Tags;
+        HexBackgroundColor = characterConfig.Color;
+        BackgroundIcon = characterConfig.Icon;
+    }
+    public void ResetConfig()
+    {
+        if (ConfigBackup == null) return;
+
+        Config = ConfigBackup;
+        Tags = Config.Tags;
+        HexBackgroundColor = Config.Color;
+        BackgroundIcon = Config.Icon;
+        ConfigBackup = null;
+    }
+
+
+
+    protected CharacterSlotConfig? ConfigBackup;
 
 
     protected override bool CheckDressType(IItemStack itemstack, EnumCharacterDressType dressType) => true;

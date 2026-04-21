@@ -32,6 +32,8 @@ public interface IPlayerInventorySlot
     string PlayerUid { get; }
     string SlotId { get; }
     public ComplexTagCondition<TagSet>? Tags { get; }
+    public TagSet ExcludeTags { get; set; }
+    public TagSet RequiredTags { get; set; }
 }
 
 public interface IBackpackSlot : IPlayerInventorySlot

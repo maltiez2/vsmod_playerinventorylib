@@ -20,6 +20,10 @@ public class PlaceholderItemSlot : ItemSlot, IPlayerInventorySlot
 
     public ComplexTagCondition<TagSet>? Tags => null;
 
+    public TagSet ExcludeTags { get; set; }
+
+    public TagSet RequiredTags { get; set; }
+
     public override bool CanHold(ItemSlot sourceSlot) => false;
 
     public override bool CanTake() => false;

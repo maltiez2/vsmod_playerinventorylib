@@ -1,0 +1,4 @@
+{
+    "entities": [],
+    "collectibles": ["slot-character", "slot-hotbar", "slot-backpack", "slot-vanilla-backpack", "slot-exclude-character", "slot-exclude-hotbar", "slot-exclude-backpack", "slot-exclude-vanilla-backpack"]
+}

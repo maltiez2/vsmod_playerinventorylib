@@ -4,6 +4,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Util;
 using Vintagestory.Common;
 
 namespace PlayerInventoryLib;
@@ -219,6 +220,8 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
     protected readonly CharacterInventorySlotsState SlotsState = new();
     protected readonly Dictionary<string, List<string>> EnabledSlotsBySlot = [];
     protected readonly Dictionary<string, List<string>> OverridenSlotsBySlot = [];
+    protected const string RequiredTag = "slot-character";
+    protected const string ExcludeTag = "slot-exclude-character";
 
 
     protected virtual ItemSlot GetSlotByIndex(int index)
@@ -232,13 +235,21 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
 
     protected void GenerateEmptySlots()
     {
-        if (SlotsById.Count != 0)
+        if (SlotsById.Count == 0)
         {
-            return;
+            foreach (string slotId in SlotsSystem.SlotIndexToId)
+            {
+                SlotsById.Add(slotId, SlotsSystem.CreateSlot(slotId, out _, this, null, playerUID));
+            }
         }
-        foreach (string slotId in SlotsSystem.SlotIndexToId)
+
+        foreach ((_, ItemSlot slot) in SlotsById)
         {
-            SlotsById.Add(slotId, SlotsSystem.CreateSlot(slotId, out _, this, null, playerUID));
+            if (slot is IPlayerInventorySlot playerSlot)
+            {
+                playerSlot.RequiredTags = playerSlot.RequiredTags.Union(RequiredTag);
+                playerSlot.ExcludeTags = playerSlot.ExcludeTags.Union(ExcludeTag);
+            }
         }
     }
 

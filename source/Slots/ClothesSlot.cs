@@ -8,7 +8,7 @@ public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySl
     public ClothesSlot(TagSet slotTag, string slotId, InventoryBase inventory, CharacterSlotConfig config, string playerUid, EnumCharacterDressType dressType) : base(dressType, inventory)
     {
         SlotId = slotId;
-        SlotIdTag = slotTag;
+        RequiredTags = slotTag;
         Config = config;
 
         Enabled = !config.Disabled;
@@ -19,14 +19,15 @@ public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySl
 
         if (dressType != EnumCharacterDressType.Unknown)
         {
-            BackgroundIcon = IconByDressType[dressType];
+            config.Icon ??= IconByDressType[dressType];
+            BackgroundIcon = config.Icon;
         }
     }
 
 
     public bool Enabled { get; set; }
     public string SlotId { get; set; }
-    public TagSet SlotIdTag { get; set; }
+    public TagSet RequiredTags { get; set; }
     public TagSet ExcludeTags { get; set; }
     public ComplexTagCondition<TagSet>? Tags { get; set; }
     public CharacterSlotConfig Config { get; set; }
@@ -40,7 +41,7 @@ public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySl
     public virtual bool FitsSlot(ItemStack stack)
     {
         return Enabled
-            && stack.Collectible.Tags.Overlaps(SlotIdTag)
+            && stack.Collectible.Tags.Overlaps(RequiredTags)
             && !stack.Collectible.Tags.Overlaps(ExcludeTags)
             && (Tags == null || Tags.Value.Matches(stack.Collectible.Tags));
     }

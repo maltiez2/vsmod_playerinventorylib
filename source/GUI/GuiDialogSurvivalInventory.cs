@@ -124,7 +124,7 @@ public class GuiDialogSurvivalInventory : GuiDialog
             if (_composer != null)
             {
                 capi.Network.SendPacketClient((Packet_Client)_backpackInv.Close(capi.World.Player));
-                _composer.GetSlotGridExcl("slotgrid").OnGuiClosed(capi);
+                _composer.GetSlotGrid("slotgrid").OnGuiClosed(capi);
             }
         }
     }
@@ -268,7 +268,7 @@ public class GuiDialogSurvivalInventory : GuiDialog
             return;
         }
 
-        ElementBounds bounds = _composer.GetSlotGridExcl("slotgrid").Bounds;
+        ElementBounds bounds = _composer.GetSlotGrid("slotgrid").Bounds;
         bounds.fixedY = 10 - GuiElementItemSlotGrid.unscaledSlotPadding - value;
         bounds.CalcWorldBounds();
 
@@ -351,7 +351,9 @@ public class GuiDialogSurvivalInventory : GuiDialog
         List<int> generalSlots = [];
         List<(float order, string category, List<int> indexes)> specialSlots = [];
 
-        for (int slotIndex = 4; slotIndex < backPackInv.Count; slotIndex++)
+        int startingIndex = (backPackInv as BackpackInventory)?.VanillaBackpackSlotsCount ?? 4;
+
+        for (int slotIndex = startingIndex; slotIndex < backPackInv.Count; slotIndex++)
         {
             ItemSlot? slot = backPackInv[slotIndex];
 
@@ -388,11 +390,14 @@ public class GuiDialogSurvivalInventory : GuiDialog
             }
         }
 
+        generalSlots = generalSlots.OrderBy(index => (backPackInv[index] as IBackpackSlot)?.BackpackSlotId ?? "").ToList();
+        generalSlots = generalSlots.OrderBy(index => (backPackInv[index] as IBackpackSlot)?.BackpackSlotConfig.Priority ?? 0).ToList();
+
         specialSlots.Sort((a, b) => Math.Sign(b.order - a.order));
 
         ElementBounds generalGridBounds = fullGridBounds;
 
-        composer.AddItemSlotGridExcl(backPackInv, SendInvPacket, 6, GetInvertedIndexes(generalSlots, backPackInv.Count), generalGridBounds, "slotgrid");
+        composer.AddItemSlotGrid(backPackInv, SendInvPacket, 6, generalSlots.ToArray(), generalGridBounds, "slotgrid");
 
         _rows.Add((int)Math.Ceiling(generalSlots.Count / 6f));
 

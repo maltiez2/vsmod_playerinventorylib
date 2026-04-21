@@ -18,6 +18,9 @@ public class SlotForVanillaBackpack : ItemSlotBackpack, IPlayerInventorySlot
     public string SlotId { get; }
     public ComplexTagCondition<TagSet>? Tags => null;
 
+    public TagSet ExcludeTags { get; set; }
+
+    public TagSet RequiredTags { get; set; }
 
     public override ItemStack TakeOutWhole()
     {

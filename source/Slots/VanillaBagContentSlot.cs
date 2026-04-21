@@ -32,4 +32,8 @@ public class VanillaBagContentSlot : ItemSlotBagContent, IBackpackSlot
     public ComplexTagCondition<TagSet>? Tags { get; set; }
 
     public string? FullSlotId { get; set; }
+
+    public TagSet ExcludeTags { get; set; }
+
+    public TagSet RequiredTags { get; set; }
 }

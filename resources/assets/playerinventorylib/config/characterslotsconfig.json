@@ -12,9 +12,9 @@
     "Waist" : {"Priority": 0.10, "Disabled": false, "HiddenWhenDisabled": false },
     "Arm" : {"Priority": 0.11, "Disabled": false, "HiddenWhenDisabled": false },
     "UpperBodyOver" : {"Priority": 0.12, "Disabled": false, "HiddenWhenDisabled": false },
-    "ArmorHead" : {"Priority": 0.13, "Disabled": true, "HiddenWhenDisabled": true, "Group": "playerinventorylib:armor" },
-    "ArmorBody" : {"Priority": 0.14, "Disabled": true, "HiddenWhenDisabled": true, "Group": "playerinventorylib:armor" },
-    "ArmorLegs" : {"Priority": 0.15, "Disabled": true, "HiddenWhenDisabled": true, "Group": "playerinventorylib:armor" }
+    "ArmorHead" : {"Priority": 0.13, "Disabled": false, "HiddenWhenDisabled": true, "Group": "playerinventorylib:armor" },
+    "ArmorBody" : {"Priority": 0.14, "Disabled": false, "HiddenWhenDisabled": true, "Group": "playerinventorylib:armor" },
+    "ArmorLegs" : {"Priority": 0.15, "Disabled": false, "HiddenWhenDisabled": true, "Group": "playerinventorylib:armor" }
   },
   "Groups": {
     "armor": {

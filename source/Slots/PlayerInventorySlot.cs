@@ -8,7 +8,7 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
     public PlayerInventorySlot(TagSet slotTag, string slotId, InventoryBase inventory, SlotConfig config, string playerUid) : base(inventory)
     {
         SlotId = slotId;
-        SlotIdTag = slotTag;
+        RequiredTags = slotTag;
         Config = config;
 
         Tags = config.Tags;
@@ -20,7 +20,7 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
 
     public bool Enabled { get; set; } = true;
     public string SlotId { get; set; }
-    public TagSet SlotIdTag { get; set; }
+    public TagSet RequiredTags { get; set; }
     public TagSet ExcludeTags { get; set; }
     public ComplexTagCondition<TagSet>? Tags { get; set; }
     public SlotConfig Config { get; set; }
@@ -34,7 +34,7 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
     public virtual bool FitsSlot(ItemStack stack)
     {
         return Enabled
-            && (SlotIdTag.IsEmpty || stack.Collectible.Tags.Overlaps(SlotIdTag))
+            && (RequiredTags.IsEmpty || stack.Collectible.Tags.Overlaps(RequiredTags))
             && !stack.Collectible.Tags.Overlaps(ExcludeTags)
             && (Tags == null || Tags.Value.Matches(stack.Collectible.Tags));
     }
@@ -122,6 +122,7 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
 
         return false;
     }
+
 
 
     protected SlotConfig? ConfigBackup;

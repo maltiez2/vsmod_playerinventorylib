@@ -1,6 +1,5 @@
 ﻿using Vintagestory.API.Common;
 using Vintagestory.API.Config;
-using Vintagestory.Common;
 
 namespace PlayerInventoryLib;
 

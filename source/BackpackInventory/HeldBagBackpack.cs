@@ -22,11 +22,13 @@ public class HeldBagBackpack : IBackpack
 
     public Dictionary<string, ItemSlot> GenerateSlots(ItemStack stack, IPlayerInventorySlot slotBackpackIsIn, string playerUid, InventoryBase inventory)
     {
+        string? color = Bag.GetSlotBgColor(stack);
         List<ItemSlotBagContent> slots = Bag.GetOrCreateSlots(stack, inventory, BagIndex, BackpackInventory.Api.World);
         Dictionary<string, ItemSlot> result = [];
         for (int slotIndex = 0; slotIndex < slots.Count; slotIndex++)
         {
             result.Add($"{slotIndex}", new VanillaBagContentSlot(slots[slotIndex], slotBackpackIsIn.SlotId, this, BackpackInventory.PlayerUID, $"{slotIndex}"));
+            result[$"{slotIndex}"].HexBackgroundColor = color;
         }
 
         return result;

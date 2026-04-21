@@ -1,4 +1,5 @@
-﻿using PlayerInventoryLib.Utils;
+﻿using OverhaulLib.Utils;
+using PlayerInventoryLib.Utils;
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
@@ -52,6 +53,7 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
     public override int Count => SlotsByIndex.Count + 1;
     public override int CountForNetworkPacket => Count;
     public string PlayerUID => playerUID;
+    public int VanillaBackpackSlotsCount => SlotsForBackpacksCount;
 
 
     public override void AfterBlocksLoaded(IWorldAccessor world)
@@ -400,10 +402,18 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
     protected readonly int SlotsForBackpacksCount;
     protected int VanillaSlotsCount = 4;
     protected const string SlotsDataAttributeName = "plrinvlib:slots";
+    protected const string ExcludeTag = "slot-exclude-backpack";
+    protected TagSet? ExcludeTagSet;
 
 
     protected virtual int AddSlot(ItemSlot slot)
     {
+        if (slot is IPlayerInventorySlot playerSlot)
+        {
+            ExcludeTagSet ??= TagsUtil.Get(ExcludeTag);
+            playerSlot.ExcludeTags = playerSlot.ExcludeTags.Union(ExcludeTagSet.Value);
+        }
+        
         for (int slotIndex = 0; slotIndex < SlotsByIndex.Count; slotIndex++)
         {
             if (SlotsByIndex[slotIndex] == PlaceholderSlot)

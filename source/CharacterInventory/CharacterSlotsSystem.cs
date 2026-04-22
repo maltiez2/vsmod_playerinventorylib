@@ -59,7 +59,8 @@ public class CharacterInventorySlotsState
 
 public class SlotConfig
 {
-    public ComplexTagCondition<TagSet>? Tags { get; set; }
+    public bool OverrideTags { get; set; } = false;
+    public ComplexTagCondition<TagSet> Tags { get; set; }
     public string? Icon { get; set; }
     public string? Color { get; set; }
 }
@@ -79,7 +80,10 @@ public class CharacterSlotConfig : SlotConfig
 
     public CharacterSlotConfig(CharacterSlotConfig previous, SlotConfig overrides)
     {
-        Tags = overrides.Tags;
+        if (overrides.OverrideTags)
+        {
+            Tags = overrides.Tags;
+        }
         Icon = overrides.Icon;
         Color = overrides.Color;
         Disabled = previous.Disabled;
@@ -167,7 +171,7 @@ public class CharacterSlotsSystem : ModSystem
         _createSlotDelegates.Add(slotId, CreatePlayerInventorySlot);
         _configs.Add(slotId, config);
     }
-    
+
 
 
     public ItemSlot CreateSlot(string slotId, out int index, CharacterInventory inventory, ItemStack? stack, string playerUid)
@@ -237,6 +241,8 @@ public class CharacterSlotsSystem : ModSystem
             }
         }
 
+        groups = groups.OrderBy(entry => GroupIdToGuiConfig[entry.Item1].Priority).ToList();
+
         foreach ((string groupId, List<int> indexes) in groups)
         {
             if (indexes.Count > 0)
@@ -263,7 +269,7 @@ public class CharacterSlotsSystem : ModSystem
         if (api is ICoreServerAPI serverApi)
         {
             RegisterSlotTags(serverApi);
-            
+
             Ready = true;
             OnReady?.Invoke();
         }
@@ -369,7 +375,7 @@ public class CharacterSlotsSystem : ModSystem
         Dictionary<string, TagSet> tags = [];
         foreach (string slotId in SlotIndexToId)
         {
-            string tagName = $"slot-{slotId.ToLowerInvariant()}";
+            string tagName = $"slot-{slotId.ToLowerInvariant().Replace(':', '-')}";
             api.CollectibleTagRegistry.Register(tagName);
             TagSet tag = api.CollectibleTagRegistry.CreateTagSet(tagName);
             tags.Add(slotId, tag);
@@ -382,7 +388,7 @@ public class CharacterSlotsSystem : ModSystem
         Dictionary<string, TagSet> tags = [];
         foreach (string slotId in SlotIndexToId)
         {
-            string tagName = $"slot-{slotId.ToLowerInvariant()}";
+            string tagName = $"slot-{slotId.ToLowerInvariant().Replace(':', '-')}";
             TagSet tag = api.CollectibleTagRegistry.CreateTagSet(tagName);
             tags.Add(slotId, tag);
         }
@@ -421,9 +427,11 @@ public class CharacterSlotsSystem : ModSystem
 
     private ItemSlot CreatePlayerInventorySlot(CharacterInventory inventory, ItemStack? stack, string playerUid, ICoreAPI api, int index, string id)
     {
-        return new PlayerInventorySlot(SlotIdToTag[id], id, inventory, _configs[id], playerUid)
+        CharacterSlotConfig config = _configs[id];
+        return new PlayerInventorySlot(SlotIdToTag[id], id, inventory, config, playerUid)
         {
-            Itemstack = stack
+            Itemstack = stack,
+            Enabled = !config.Disabled
         };
     }
 }

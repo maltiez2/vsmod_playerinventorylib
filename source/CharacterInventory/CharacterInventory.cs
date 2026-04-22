@@ -4,7 +4,6 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
-using Vintagestory.API.Util;
 using Vintagestory.Common;
 
 namespace PlayerInventoryLib;
@@ -15,11 +14,6 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
     public CharacterInventory(string className, string playerUID, ICoreAPI api) : base(className, playerUID, api)
     {
         SlotsSystem = Api.ModLoader.GetModSystem<CharacterSlotsSystem>() ?? throw new Exception("Unable to find 'CharacterSlotsSystem' when creating 'CharacterInventory'");
-        for (int slotIndex = 0; slotIndex < VanillaSlotsCount; slotIndex++)
-        {
-            DummySlots.Add(new ItemSlot(this));
-            DummySlots[slotIndex].Itemstack = null;
-        }
         if (SlotsSystem.Ready)
         {
             GenerateEmptySlots();
@@ -28,15 +22,11 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
         {
             SlotsSystem.OnReady += GenerateEmptySlots;
         }
+        PlaceholderSlot = new(playerUID, "placeholder", this);
     }
     public CharacterInventory(string inventoryID, ICoreAPI api) : base(inventoryID, api)
     {
         SlotsSystem = Api.ModLoader.GetModSystem<CharacterSlotsSystem>() ?? throw new Exception("Unable to find 'CharacterSlotsSystem' when creating 'CharacterInventory'");
-        for (int slotIndex = 0; slotIndex < VanillaSlotsCount; slotIndex++)
-        {
-            DummySlots.Add(new ItemSlot(this));
-            DummySlots[slotIndex].Itemstack = null;
-        }
         if (SlotsSystem.Ready)
         {
             GenerateEmptySlots();
@@ -45,12 +35,13 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
         {
             SlotsSystem.OnReady += GenerateEmptySlots;
         }
+        PlaceholderSlot = new(playerUID, "placeholder", this);
     }
 
 
 
     public override ItemSlot this[int slotIndex] { get => GetSlotByIndex(slotIndex); set => LoggerUtil.Warn(Api, this, "CharacterInventory slots cannot be set"); }
-    public override int Count => Math.Max(SlotsById.Count, DummySlots.Count);
+    public override int Count => Math.Max(SlotsById.Count, 15);
 
     public event Action<CharacterInventory, ItemSlot, string, int>? OnSlotModified;
 
@@ -59,7 +50,12 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
     public string PlayerUID => playerUID;
 
 
-    public virtual ItemSlot GetSlot(string id) => SlotsById[id];
+    public virtual ItemSlot GetSlot(string id)
+    {
+        if (SlotsById.TryGetValue(id, out ItemSlot? slot)) return slot;
+
+        return PlaceholderSlot;
+    }
 
     public override void FromTreeAttributes(ITreeAttribute tree)
     {
@@ -172,12 +168,9 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
             }
         }
 
-        for (int i = 0; i < DummySlots.Count; i++)
+        if (slot == PlaceholderSlot)
         {
-            if (DummySlots[i] == slot)
-            {
-                return i;
-            }
+            return 0;
         }
 
         return -1;
@@ -212,7 +205,6 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
     protected readonly CharacterSlotsSystem SlotsSystem;
     protected const int CurrentImplementationVersion = 1;
     protected readonly Dictionary<string, ItemSlot> SlotsById = [];
-    protected readonly List<ItemSlot> DummySlots = [];
     protected ITreeAttribute PreviousSerializedData = new TreeAttribute();
     protected ITreeAttribute PreviousVanillaSerializedData = new TreeAttribute();
     protected int VanillaSlotsCount = 15;
@@ -222,13 +214,14 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
     protected readonly Dictionary<string, List<string>> OverridenSlotsBySlot = [];
     protected const string RequiredTag = "slot-character";
     protected const string ExcludeTag = "slot-exclude-character";
+    protected readonly PlaceholderItemSlot PlaceholderSlot;
 
 
     protected virtual ItemSlot GetSlotByIndex(int index)
     {
         if (SlotsById.Count == 0)
         {
-            return DummySlots[index];
+            return PlaceholderSlot;
         }
         return SlotsById[SlotsSystem.SlotIndexToId[index]]; // @TODO: optimize later
     }

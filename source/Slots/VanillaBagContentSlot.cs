@@ -53,7 +53,7 @@ public class VanillaBagContentSlot : ItemSlotBagContent, IBackpackSlot, IClickab
             && (backpack == null || !ExcludeTags.Overlaps(backpack.GetAdditionalTags(stack)))
             && (RequiredTags.IsEmpty || stack.Collectible.Tags.Overlaps(RequiredTags))
             && !stack.Collectible.Tags.Overlaps(ExcludeTags)
-            && (Tags == null || Tags.Value.Matches(stack.Collectible.Tags));
+            && (Tags == null || Tags.Value.IsEmpty || Tags.Value.Matches(stack.Collectible.Tags));
     }
 
     public override void ActivateSlot(ItemSlot sourceSlot, ref ItemStackMoveOperation op)

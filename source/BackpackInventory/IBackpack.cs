@@ -1,4 +1,5 @@
 ﻿using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
 
 namespace PlayerInventoryLib;
 
@@ -6,7 +7,7 @@ public interface IBackpack
 {
     string BackpackId { get; }
 
-    Dictionary<string, ItemSlot> GenerateSlots(ItemStack stack, IPlayerInventorySlot slotBackpackIsIn, string playerUid, InventoryBase inventory);
+    Dictionary<string, ItemSlot> GenerateSlots(ItemStack stack, IPlayerInventorySlot slotBackpackIsIn, string playerUid, InventoryBase backpackInventory);
     void StoreSlots(ItemStack stack, IPlayerInventorySlot slot, Dictionary<string, ItemSlot> slots);
     void OnBackpackSlotModified(IBackpackSlot backpackSlot);
     /// <summary>
@@ -15,4 +16,5 @@ public interface IBackpack
     /// <param name="slotBackpackIsIn">Slot current backpack is in</param>
     /// <returns>if 'true', BackpackInventory.RemoveSlots and BackpackInventory.AddSlots will be called</returns>
     bool RequiresSlotsReload(IPlayerInventorySlot slotBackpackIsIn);
+    TagSet GetAdditionalTags(ItemStack stack);
 }

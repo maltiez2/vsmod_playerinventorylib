@@ -1,4 +1,5 @@
-﻿using Vintagestory.API.Common;
+﻿using OverhaulLib.Utils;
+using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 
 namespace PlayerInventoryLib.Backpacks;
@@ -6,6 +7,7 @@ namespace PlayerInventoryLib.Backpacks;
 public class BackpackConfig
 {
     public Dictionary<string, BackpackSlotGroupData> SlotGroups { get; set; } = [];
+    public string[] NotEmptyTags { get; set; } = ["slot-exclude-hotbar", "slot-exclude-backpack"];
 }
 
 public class BackpackSlotGroupData : BackpackSlotConfig
@@ -23,7 +25,17 @@ public class BackpackBehavior : CollectibleBehavior, IBackpack
 
     public string BackpackId => collObj.Code;
     public BackpackConfig Config { get; set; } = new();
+    public TagSet NotEmptyTags { get; set; } = TagSet.Empty;
+    public ICoreAPI? Api { get; set; }
 
+    public override void OnLoaded(ICoreAPI api)
+    {
+        base.OnLoaded(api);
+
+        Api = api;
+
+        NotEmptyTags = Api.GetTagSet(Config.NotEmptyTags);
+    }
 
     public override void Initialize(JsonObject properties)
     {
@@ -34,8 +46,7 @@ public class BackpackBehavior : CollectibleBehavior, IBackpack
 
     public virtual Dictionary<string, ItemSlot> GenerateSlots(ItemStack stack, IPlayerInventorySlot slotBackpackIsIn, string playerUid, InventoryBase inventory)
     {
-        ItemSlot backpackSlot = slotBackpackIsIn as ItemSlot ?? throw new Exception("slotBackpackIsIn is not ItemSlot");
-
+        //ItemSlot backpackSlot = slotBackpackIsIn as ItemSlot ?? throw new Exception("slotBackpackIsIn is not ItemSlot");
 
         Dictionary<string, ItemSlot> result = [];
         foreach ((string groupId, BackpackSlotGroupData config) in Config.SlotGroups)
@@ -61,7 +72,11 @@ public class BackpackBehavior : CollectibleBehavior, IBackpack
     {
         WriteContentToAttributes(stack, slots);
     }
-    
+    public virtual TagSet GetAdditionalTags(ItemStack stack)
+    {
+        return TagSet.Empty;
+    }
+
 
 
     protected virtual void ReadContentFromAttributes(ItemStack stack, Dictionary<string, ItemSlot> slots)
@@ -73,12 +88,31 @@ public class BackpackBehavior : CollectibleBehavior, IBackpack
 
         foreach ((string slotId, ItemSlot slot) in slots)
         {
-            ItemStack storedStack = backpackTree.GetItemstack(slotId);
+            ItemStack? storedStack = backpackTree.GetItemstack(slotId);
             if (storedStack == null) continue;
 
             storedStack.ResolveBlockOrItem(slot.Inventory.Api.World);
             slot.Itemstack = storedStack;
         }
+    }
+
+    protected virtual bool IsEmpty(ItemStack stack)
+    {
+        if (stack?.Attributes == null) return true;
+
+        ITreeAttribute backpackTree = stack.Attributes.GetTreeAttribute("backpackSlots");
+        if (backpackTree == null) return true;
+
+        foreach ((string code, _) in backpackTree)
+        {
+            ItemStack? storedStack = backpackTree.GetItemstack(code);
+            if (storedStack != null && storedStack.StackSize > 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     protected virtual void WriteContentToAttributes(ItemStack stack, Dictionary<string, ItemSlot> slots)

@@ -1,4 +1,5 @@
-﻿using Vintagestory.API.Common;
+﻿using OverhaulLib.Utils;
+using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 
 namespace PlayerInventoryLib;
@@ -33,7 +34,15 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
 
     public virtual bool FitsSlot(ItemStack stack)
     {
+        if (stack.Collectible == null)
+        {
+            return false;
+        }
+        
+        IBackpack? backpack = stack.Collectible.GetCollectibleInterface<IBackpack>();
+        
         return Enabled
+            && (backpack == null || !ExcludeTags.Overlaps(backpack.GetAdditionalTags(stack)))
             && (RequiredTags.IsEmpty || stack.Collectible.Tags.Overlaps(RequiredTags))
             && !stack.Collectible.Tags.Overlaps(ExcludeTags)
             && (Tags == null || Tags.Value.Matches(stack.Collectible.Tags));

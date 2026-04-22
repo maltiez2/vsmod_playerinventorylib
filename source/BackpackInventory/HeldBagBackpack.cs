@@ -1,5 +1,7 @@
 ﻿using System.Diagnostics;
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
+using OverhaulLib.Utils;
 
 namespace PlayerInventoryLib;
 
@@ -20,6 +22,11 @@ public class HeldBagBackpack : IBackpack
     public int BagIndex { get; set; }
     public BackpackInventory BackpackInventory { get; set; }
 
+    public readonly string[] NotEmptyTags = ["slot-exclude-hotbar", "slot-exclude-backpack"];
+
+    public TagSet NotEmptyTagsSet { get; set; } = TagSet.Empty;
+
+
     public Dictionary<string, ItemSlot> GenerateSlots(ItemStack stack, IPlayerInventorySlot slotBackpackIsIn, string playerUid, InventoryBase inventory)
     {
         string? color = Bag.GetSlotBgColor(stack);
@@ -32,6 +39,16 @@ public class HeldBagBackpack : IBackpack
         }
 
         return result;
+    }
+
+    public TagSet GetAdditionalTags(ItemStack stack)
+    {
+        if (NotEmptyTagsSet == TagSet.Empty)
+        {
+            NotEmptyTagsSet = BackpackInventory.Api.GetTagSet(NotEmptyTags);
+        }
+        
+        return Bag.IsEmpty(stack) ? TagSet.Empty : NotEmptyTagsSet;
     }
 
     public void OnBackpackSlotModified(IBackpackSlot backpackSlot)

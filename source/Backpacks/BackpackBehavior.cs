@@ -1,4 +1,5 @@
 ﻿using OverhaulLib.Utils;
+using System.Text;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 
@@ -36,18 +37,21 @@ public class BackpackBehavior : CollectibleBehavior, IBackpack
 
         NotEmptyTags = Api.GetTagSet(Config.NotEmptyTags);
     }
-
     public override void Initialize(JsonObject properties)
     {
         base.Initialize(properties);
 
         Config = properties.AsObject<BackpackConfig>() ?? new();
     }
+    public override void GetHeldItemInfo(ItemSlot inSlot, StringBuilder dsc, IWorldAccessor world, bool withDebugInfo)
+    {
+        dsc.AppendLine($"Capacity: {Config.SlotGroups.Select(entry => entry.Value.Number).Sum()} slots");
+        
+        base.GetHeldItemInfo(inSlot, dsc, world, withDebugInfo);
+    }
 
     public virtual Dictionary<string, ItemSlot> GenerateSlots(ItemStack stack, IPlayerInventorySlot slotBackpackIsIn, string playerUid, InventoryBase inventory)
     {
-        //ItemSlot backpackSlot = slotBackpackIsIn as ItemSlot ?? throw new Exception("slotBackpackIsIn is not ItemSlot");
-
         Dictionary<string, ItemSlot> result = [];
         foreach ((string groupId, BackpackSlotGroupData config) in Config.SlotGroups)
         {
@@ -74,7 +78,7 @@ public class BackpackBehavior : CollectibleBehavior, IBackpack
     }
     public virtual TagSet GetAdditionalTags(ItemStack stack)
     {
-        return TagSet.Empty;
+        return IsEmpty(stack) ? TagSet.Empty : NotEmptyTags;
     }
 
 

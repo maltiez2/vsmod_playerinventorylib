@@ -129,6 +129,19 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
         {
             if (existingSlot == slot)
             {
+                if (slot.Itemstack?.Collectible != null)
+                {
+                    if (slot.Itemstack.Collectible is IOnSlotModifiedListener listener)
+                    {
+                        listener.OnSlotModified(slot);
+                    }
+
+                    foreach (IOnSlotModifiedListener behavior in slot.Itemstack.Collectible.CollectibleBehaviors.OfType<IOnSlotModifiedListener>())
+                    {
+                        behavior.OnSlotModified(slot);
+                    }
+                }
+
                 OnSlotModified?.Invoke(this, slot, id, SlotsSystem.SlotIdToIndex[id]);
                 break;
             }
@@ -248,6 +261,8 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
 
     protected virtual void ProcessEnableSlots(ItemSlot slot)
     {
+        if (slot == PlaceholderSlot) return;
+        
         IEnableSlots? enableSlots = slot.Itemstack?.Collectible?.GetCollectibleInterface<IEnableSlots>();
         if (enableSlots == null || slot.Itemstack == null || slot is not IPlayerInventorySlot playerInventorySlot)
         {
@@ -291,6 +306,8 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
 
     protected virtual void RevertEnableSlots(ItemSlot slot)
     {
+        if (slot == PlaceholderSlot) return;
+
         IEnableSlots? enableSlots = slot.Itemstack?.Collectible?.GetCollectibleInterface<IEnableSlots>();
         if (enableSlots == null || slot.Itemstack == null || slot is not IPlayerInventorySlot playerInventorySlot)
         {
@@ -331,6 +348,8 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
 
     protected virtual void ProcessBackpack(ItemSlot slot)
     {
+        if (slot == PlaceholderSlot) return;
+
         IBackpack? backpack = slot.Itemstack?.Collectible?.GetCollectibleInterface<IBackpack>();
         BackpackInventory? inventory = Api.World.PlayerByUid(playerUID)?.InventoryManager?.GetOwnInventory(GlobalConstants.backpackInvClassName) as BackpackInventory;
 
@@ -348,6 +367,8 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
 
     protected virtual void RevertBackpack(ItemSlot slot)
     {
+        if (slot == PlaceholderSlot) return;
+
         IBackpack? backpack = slot.Itemstack?.Collectible?.GetCollectibleInterface<IBackpack>();
         if (backpack != null && Player?.InventoryManager?.GetOwnInventory(GlobalConstants.backpackInvClassName) is BackpackInventory inventory && slot is IPlayerInventorySlot playerSlot && slot.Itemstack != null)
         {

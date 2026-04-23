@@ -4,7 +4,7 @@ using Vintagestory.API.Datastructures;
 
 namespace PlayerInventoryLib;
 
-public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlot, IConfigurableSlot
+public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlot, IConfigurableSlot, IHighlightableSlot
 {
     public PlayerInventorySlot(TagSet slotTag, string slotId, InventoryBase inventory, SlotConfig config, string playerUid) : base(inventory)
     {
@@ -14,6 +14,7 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
 
         Tags = config.Tags;
         HexBackgroundColor = config.Color;
+        DefaultColor = config.Color;
         BackgroundIcon = config.Icon;
         PlayerUid = playerUid;
     }
@@ -132,9 +133,18 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
         return false;
     }
 
+    public void Highlight(string color)
+    {
+        HexBackgroundColor = color;
+    }
+    public void Unhighlight()
+    {
+        HexBackgroundColor = DefaultColor;
+    }
 
 
     protected SlotConfig? ConfigBackup;
+    protected string? DefaultColor;
 
     protected override void FlipWith(ItemSlot withSlot)
     {
@@ -145,4 +155,5 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
 
         base.FlipWith(withSlot);
     }
+
 }

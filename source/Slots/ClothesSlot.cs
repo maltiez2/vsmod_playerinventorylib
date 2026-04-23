@@ -3,7 +3,7 @@ using Vintagestory.API.Datastructures;
 
 namespace PlayerInventoryLib;
 
-public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySlot, IConfigurableSlot
+public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySlot, IConfigurableSlot, IHighlightableSlot
 {
     public ClothesSlot(TagSet slotTag, string slotId, InventoryBase inventory, CharacterSlotConfig config, string playerUid, EnumCharacterDressType dressType) : base(dressType, inventory)
     {
@@ -14,6 +14,7 @@ public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySl
         Enabled = !config.Disabled;
         Tags = config.Tags;
         HexBackgroundColor = config.Color;
+        DefaultColor = config.Color;
         BackgroundIcon = config.Icon;
         PlayerUid = playerUid;
 
@@ -108,9 +109,19 @@ public class ClothesSlot : ItemSlotCharacter, IClickableSlot, IPlayerInventorySl
         ConfigBackup = null;
     }
 
+    public void Highlight(string color)
+    {
+        HexBackgroundColor = color;
+    }
+    public void Unhighlight()
+    {
+        HexBackgroundColor = DefaultColor;
+    }
+
 
 
     protected CharacterSlotConfig? ConfigBackup;
+    protected string? DefaultColor;
 
 
     protected override bool CheckDressType(IItemStack itemstack, EnumCharacterDressType dressType) => true;

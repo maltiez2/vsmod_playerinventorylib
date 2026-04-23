@@ -1,6 +1,7 @@
 ﻿using OverhaulLib.Utils;
 using PlayerInventoryLib.Utils;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Vintagestory.API.Common;
@@ -85,6 +86,26 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
     }
     public override void OnItemSlotModified(ItemSlot slot)
     {
+        foreach (ItemSlot existingSlot in SlotsByIndex)
+        {
+            if (existingSlot == slot)
+            {
+                if (slot.Itemstack?.Collectible != null)
+                {
+                    if (slot.Itemstack.Collectible is IOnSlotModifiedListener listener)
+                    {
+                        listener.OnSlotModified(slot);
+                    }
+
+                    foreach (IOnSlotModifiedListener behavior in slot.Itemstack.Collectible.CollectibleBehaviors.OfType<IOnSlotModifiedListener>())
+                    {
+                        behavior.OnSlotModified(slot);
+                    }
+                }
+                break;
+            }
+        }
+
         if (slot is IBackpackSlot backpackSlot)
         {
             backpackSlot.Backpack.OnBackpackSlotModified(backpackSlot);
@@ -288,6 +309,8 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
     {
         string backpackId = GetBackpackFullId(backpack.BackpackId, slotForBackpack.SlotId);
 
+        Log.Warn(Api, this, $"({Api.Side}) Adding '{backpackId}' slots");
+
         if (SlotsByBackpackSlotId.ContainsKey(backpackId))
         {
             return false;
@@ -321,6 +344,8 @@ public class BackpackInventory : InventoryPlayerBackpacks, IPlayerInventory
     public virtual bool RemoveSlots(IBackpack backpack, ItemStack? backpackStack, IPlayerInventorySlot slotForBackpack, bool storeSlots = true)
     {
         string backpackId = GetBackpackFullId(backpack.BackpackId, slotForBackpack.SlotId);
+
+        Log.Warn(Api, this, $"({Api.Side}) Removing '{backpackId}' slots");
 
         if (!SlotsByBackpackSlotId.TryGetValue(backpackId, out Dictionary<string, ItemSlot>? backpackSlots))
         {

@@ -9,3 +9,9 @@ public interface IPlayerInventory : IOwnedInventory
     string PlayerUID { get; }
     void DropSlot(ItemSlot slot);
 }
+
+public interface IHighlightableSlot
+{
+    void Highlight(string color);
+    void Unhighlight();
+}

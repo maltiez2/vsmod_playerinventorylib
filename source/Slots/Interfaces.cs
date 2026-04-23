@@ -43,3 +43,8 @@ public interface IBackpackSlot : IPlayerInventorySlot
     BackpackSlotConfig BackpackSlotConfig { get; }
     public string? FullSlotId { get; set; }
 }
+
+public interface IOnSlotModifiedListener
+{
+    void OnSlotModified(ItemSlot slot);
+}

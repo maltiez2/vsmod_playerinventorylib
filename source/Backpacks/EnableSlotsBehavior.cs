@@ -1,5 +1,6 @@
 ﻿using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.Util;
 
 namespace PlayerInventoryLib.Backpacks;
 
@@ -25,6 +26,18 @@ public class EnableSlotsBehavior : CollectibleBehavior, IEnableSlots
         base.Initialize(properties);
 
         Config = properties.AsObject<EnableSlotsConfig>() ?? Config;
+
+        Dictionary<string, SlotConfig> resolvedOverrides = [];
+        foreach ((string slotCode, SlotConfig config) in Config.ConfigOverride)
+        {
+            foreach (string enabledSlotCode in Config.SlotsToEnable)
+            {
+                if (!WildcardUtil.Match(slotCode, enabledSlotCode)) continue;
+
+                resolvedOverrides[slotCode] = config;
+            }
+        }
+        Config.ConfigOverride = resolvedOverrides;
     }
 
 

@@ -223,6 +223,7 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         double bottomMiddleSectionInternalPadding = 2;
         double textHeight = 16;
         double dialogPadding = 4;
+        double sideColumnsVerticalOffset = 3;
         int totalHeight = 400;
 
         int outerColumnSlotsNumber = Math.Max(CharacterTabSlotsState.RightSlots.Count, CharacterTabSlotsState.LeftSlots.Count);
@@ -235,8 +236,8 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         groupFont.Orientation = EnumTextOrientation.Center;
 
         // Outer columns
-        ElementBounds leftSlotsColumnBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, internalPadding, verticalPadding, 1, outerColumnSlotsNumber).FixedGrow(0, padding);
-        ElementBounds rightSlotsColumnBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, 0, verticalPadding, 1, outerColumnSlotsNumber).FixedGrow(0, padding);
+        ElementBounds leftSlotsColumnBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, internalPadding, verticalPadding + sideColumnsVerticalOffset, 1, outerColumnSlotsNumber).FixedGrow(0, padding);
+        ElementBounds rightSlotsColumnBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, 0, verticalPadding + sideColumnsVerticalOffset, 1, outerColumnSlotsNumber).FixedGrow(0, padding);
         // Clothes
         ElementBounds leftClothesSlotsBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, 2, 3, 1, clothesColumnSlotsNumber).FixedGrow(0, padding);
         ElementBounds rightClothesSlotsBounds = ElementStdBounds.SlotGrid(EnumDialogArea.None, -2, 3, 1, clothesColumnSlotsNumber).FixedGrow(0, padding);
@@ -279,10 +280,10 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
         compo.AddScrollableInset(topMiddleSectionBounds, 0, 1);
         compo.AddScrollableInset(insetSlotBounds, 3, 0.8f);
 
-        compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, CharacterTabSlotsState.LeftSlots.ToArray(), leftSlotsColumnBounds, "leftLeftSlots");
-        compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, [0, 1, 2, 11, 3, 4], leftClothesSlotsBounds, "leftSlots");
-        compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, [6, 7, 8, 10, 5, 9], rightClothesSlotsBounds, "rightSlots");
-        compo.AddItemSlotGrid(characterInv, SendInvPacket, 1, CharacterTabSlotsState.RightSlots.ToArray(), rightSlotsColumnBounds, "rightRightSlots");
+        compo.AddItemSlotGrid(characterInv, SendInvPacketCustom, 1, CharacterTabSlotsState.LeftSlots.ToArray(), leftSlotsColumnBounds, "leftLeftSlots");
+        compo.AddItemSlotGrid(characterInv, SendInvPacketCustom, 1, [0, 1, 2, 11, 3, 4], leftClothesSlotsBounds, "leftSlots");
+        compo.AddItemSlotGrid(characterInv, SendInvPacketCustom, 1, [6, 7, 8, 10, 5, 9], rightClothesSlotsBounds, "rightSlots");
+        compo.AddItemSlotGrid(characterInv, SendInvPacketCustom, 1, CharacterTabSlotsState.RightSlots.ToArray(), rightSlotsColumnBounds, "rightRightSlots");
         
 
         ElementBounds? lastGroupBouds = null;
@@ -312,7 +313,7 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
             lastGroupBouds = insetBounds;
 
             compo.AddScrollableInset(insetBounds, 3, 0.8f);
-            compo.AddItemSlotGrid(characterInv, SendInvPacket, slotsInRowNumber, slotIndexes.ToArray(), slotsBounds, $"middleSlots-{groupCode}");
+            compo.AddItemSlotGrid(characterInv, SendInvPacketCustom, slotsInRowNumber, slotIndexes.ToArray(), slotsBounds, $"middleSlots-{groupCode}");
             compo.AddRichtext(groupText, groupFont, textBounds, $"groupText-{groupCode}");
         }
 
@@ -391,7 +392,7 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
                 .CreateCompo("playercharacter", DialogBounds)
                 .AddShadedDialogBG(BackgroundBounds, true)
                 .AddDialogTitleBar(title, OnTitleBarClose)
-                .AddHorizontalTabs(tabs.ToArray(), tabBounds, OnTabClicked, CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), "tabs")
+                .AddHorizontalTabs(tabs.ToArray(), tabBounds, OnTabClickedCustom, CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold), "tabs")
                 .BeginChildElements(BackgroundBounds)
             ;
 
@@ -419,33 +420,35 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
             Debug.WriteLine(exception);
         }
     }
-    protected virtual void HighlightSlots()
+    protected override void HighlightSlots()
     {
         ItemSlot mouseSlot = clientApi.World.Player.InventoryManager.MouseItemSlot;
         ItemSlot targetSlot = mouseSlot.Empty ? clientApi.World.Player.InventoryManager.CurrentHoveredSlot ?? mouseSlot : mouseSlot;
-        int currentItem = targetSlot?.Itemstack?.Item?.ItemId ?? 0;
+        int currentItem = targetSlot.Itemstack?.Item?.ItemId ?? 0;
         if (currentItem == lastItemIdSelected) return;
         lastItemIdSelected = currentItem;
 
         foreach (ItemSlot slot in characterInv)
         {
+            if (slot is not IHighlightableSlot highlitghtable) continue;
+            
             if (slot.CanHold(targetSlot))
             {
-                slot.HexBackgroundColor = "#5fbed4";
+                highlitghtable.Highlight("#5fbed4");
             }
             else
             {
-                slot.HexBackgroundColor = null;
+                highlitghtable.Unhighlight();
             }
         }
     }
-    protected virtual void OnTabClicked(int tabindex)
+    protected virtual void OnTabClickedCustom(int tabindex)
     {
         TabClicked?.Invoke(tabindex);
         curTab = tabindex;
         ComposeGuis();
     }
-    protected virtual void SendInvPacket(object packet)
+    protected virtual void SendInvPacketCustom(object packet)
     {
         capi.Network.SendPacketClient(packet);
     }

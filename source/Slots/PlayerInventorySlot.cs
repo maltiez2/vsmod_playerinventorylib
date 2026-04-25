@@ -1,4 +1,5 @@
 ﻿using OverhaulLib.Utils;
+using System.Diagnostics;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 
@@ -41,7 +42,11 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
         }
         
         IBackpack? backpack = stack.Collectible.GetCollectibleInterface<IBackpack>();
-        
+
+        bool m = Tags == null || Tags.Value.IsEmpty || Tags.Value.Matches(stack.Collectible.Tags);
+        Debug.WriteLine($"{SlotId} - {m}");
+
+
         return Enabled
             && (backpack == null || !ExcludeTags.Overlaps(backpack.GetAdditionalTags(stack)))
             && (RequiredTags.IsEmpty || stack.Collectible.Tags.Overlaps(RequiredTags))
@@ -85,7 +90,10 @@ public class PlayerInventorySlot : ItemSlot, IClickableSlot, IPlayerInventorySlo
         ConfigBackup ??= Config;
 
         Config = config;
-        Tags = config.Tags;
+        if (config.OverrideTags)
+        {
+            Tags = config.Tags;
+        }
         HexBackgroundColor = config.Color;
         BackgroundIcon = config.Icon;
     }

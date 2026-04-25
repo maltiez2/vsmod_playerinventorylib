@@ -34,7 +34,7 @@ public class EnableSlotsBehavior : CollectibleBehavior, IEnableSlots
             {
                 if (!WildcardUtil.Match(slotCode, enabledSlotCode)) continue;
 
-                resolvedOverrides[slotCode] = config;
+                resolvedOverrides[enabledSlotCode] = config;
             }
         }
         Config.ConfigOverride = resolvedOverrides;

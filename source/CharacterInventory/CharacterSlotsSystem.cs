@@ -1,9 +1,12 @@
-﻿using PlayerInventoryLib.Utils;
+﻿using OverhaulLib.Utils;
+using PlayerInventoryLib.Utils;
 using System.Collections.Immutable;
+using System.Text;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.Server;
+using Vintagestory.GameContent;
 
 namespace PlayerInventoryLib;
 
@@ -398,9 +401,14 @@ public class CharacterSlotsSystem : ModSystem
     private void AddTagsToCollectibles(ICoreAPI api)
     {
         List<CollectibleObject> collectibles = api.World.Collectibles;
+        StringBuilder addedTags = new();
+        addedTags.AppendLine("Added tags for character inventory slots to collectibles:");
         foreach (CollectibleObject collectible in collectibles)
         {
-            string? clothesCategory = collectible.Attributes?["clothescategory"]?.AsString() ?? collectible.Attributes?["attachableToEntity"]?["categoryCode"]?.AsString();
+            ItemStack stack = new(collectible);
+            stack.ResolveBlockOrItem(api.World);
+            string? clothesCategory = IAttachableToEntity.FromCollectible(collectible)?.GetCategoryCode(stack);
+
             if (clothesCategory == null)
             {
                 continue;
@@ -408,13 +416,17 @@ public class CharacterSlotsSystem : ModSystem
 
             foreach (string slotId in SlotIndexToId.Where(slotId => slotId.Equals(clothesCategory, StringComparison.InvariantCultureIgnoreCase)))
             {
+                addedTags.AppendLine($"Added 'slot-{slotId.ToLowerInvariant()}' tag to '{collectible.Code}'");
                 TagSet slotTag = SlotIdToTag[slotId];
                 // WTF IS THIS MESS!? Where are my set opreations in TagSet!?
-                IEnumerable<string> collectibleTags = api.CollectibleTagRegistry.SlowEnumerateTagNames(collectible.Tags);
+                /*IEnumerable<string> collectibleTags = api.CollectibleTagRegistry.SlowEnumerateTagNames(collectible.Tags);
                 IEnumerable<string> slotTags = api.CollectibleTagRegistry.SlowEnumerateTagNames(slotTag);
-                collectible.Tags = api.CollectibleTagRegistry.CreateTagSet(collectibleTags.Concat(slotTags));
+                collectible.Tags = api.CollectibleTagRegistry.CreateTagSet(collectibleTags.Concat(slotTags));*/
+                // Here they are, implemented them myself
+                collectible.Tags = collectible.Tags.Union(slotTag);
             }
         }
+        Log.Verbose(api, this, addedTags.ToString());
     }
 
     private ItemSlot CreateClothesSlot(CharacterInventory inventory, ItemStack? stack, string playerUid, ICoreAPI api, int index, string id)

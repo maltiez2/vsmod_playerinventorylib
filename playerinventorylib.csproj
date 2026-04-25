@@ -3,7 +3,7 @@
   <PropertyGroup>
     <ModName>Player Inventory lib</ModName>
     <ModType>code</ModType>
-    <ModVersion>0.0.2</ModVersion>
+    <ModVersion>0.0.6</ModVersion>
     <ModId>playerinventorylib</ModId>
     <Description></Description>
     <Side>universal</Side>

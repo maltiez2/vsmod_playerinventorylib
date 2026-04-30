@@ -213,6 +213,19 @@ public class CharacterInventory : InventoryCharacter, IPlayerInventory
         slot.MarkDirty();
     }
 
+    public override void DidModifyItemSlot(ItemSlot slot, ItemStack extractedStack = null)
+    {
+        int slotId = GetSlotId(slot);
+
+        if (slotId < 0)
+        {
+            Log.Verbose(Api, this, $"Trying to 'DidModifyItemSlot' for slots that is no logner part of inventory '{InventoryID}({Log.GetCallerTypeName(this)})'. Slot contains: {slot.Itemstack}");
+            return;
+        }
+
+        base.DidModifyItemSlot(slot, extractedStack);
+    }
+
 
 
     protected readonly CharacterSlotsSystem SlotsSystem;

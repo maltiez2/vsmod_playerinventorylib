@@ -37,6 +37,8 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
     public int CurrentTab { get => curTab; set => curTab = value; }
     public CharacterInventorySlotsState CharacterTabSlotsState { get; } = new();
     public CharacterSlotsSystem SlotsSystem { get; }
+    public int DialogHeight { get; } = 396;
+    public int DialogWidth { get; } = 414;
 
 
     public override void OnMouseDown(MouseEvent args)
@@ -358,19 +360,11 @@ public class CustomGuiDialogCharacter : GuiDialogCharacter
                 charInv.OnGuiRecomposeRequest += OnRecomposeRequest;
             }
 
-            BackgroundBounds = ElementBounds.Fill.WithFixedPadding(2);
+            BackgroundBounds = ElementBounds.Fill.WithFixedPadding(GuiStyle.ElementToDialogPadding);
 
-            if (curTab == 0)
-            {
-                BackgroundBounds.BothSizing = ElementSizing.FitToChildren;
-            }
-            else
-            {
-                BackgroundBounds.BothSizing = ElementSizing.Fixed;
-                BackgroundBounds.fixedWidth = mainTabInnerSize.Width;
-                BackgroundBounds.fixedHeight = mainTabInnerSize.Height;
-            }
-
+            BackgroundBounds.BothSizing = ElementSizing.Fixed;
+            BackgroundBounds.fixedWidth = DialogWidth;
+            BackgroundBounds.fixedHeight = DialogHeight;
 
             DialogBounds = ElementStdBounds
                 .AutosizedMainDialog.WithAlignment(EnumDialogArea.LeftMiddle)

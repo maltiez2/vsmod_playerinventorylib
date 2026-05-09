@@ -161,6 +161,15 @@ public class GuiDialogSurvivalInventory : GuiDialog
         _composer?.Dispose();
     }
 
+    public override void OnRenderGUI(float deltaTime)
+    {
+        base.OnRenderGUI(deltaTime);
+        if (_craftingGridCurrentPackets.Count > 0)
+        {
+            SendInvPacketFromTimeoutQueue();
+        }
+    }
+
 
 
     private IInventory? _backpackInv;
@@ -171,6 +180,10 @@ public class GuiDialogSurvivalInventory : GuiDialog
     private readonly ICoreClientAPI _api;
     private readonly List<int> _rows = [];
     private GuiComposer? _composer;
+    private long _craftingGridLastPacketMs = 0;
+    private const long _craftingGridSynchronisationTimeoutMs = 300;
+    private readonly List<object> _craftingGridCurrentPackets = [];
+
 
     private void ComposeSurvivalInvDialog()
     {
@@ -240,7 +253,7 @@ public class GuiDialogSurvivalInventory : GuiDialog
         ComposeBackpackSlots(composer, _backpackInv, fullGridBounds);
         composer.EndClip();
 
-        composer.AddItemSlotGrid(_craftingInv, (data) => SendInvPacket(data), 3, [0, 1, 2, 3, 4, 5, 6, 7, 8], gridBounds, "craftinggrid");
+        composer.AddItemSlotGrid(_craftingInv, (data) => SendInvPacketWithTimeout(data), 3, [0, 1, 2, 3, 4, 5, 6, 7, 8], gridBounds, "craftinggrid");
         composer.AddItemSlotGrid(_craftingInv, (data) => SendInvPacket(data), 1, [9], outputBounds, "outputslot");
 
         try
@@ -311,6 +324,30 @@ public class GuiDialogSurvivalInventory : GuiDialog
     private void SendInvPacket(object packet)
     {
         capi.Network.SendPacketClient(packet);
+    }
+
+    private void SendInvPacketFromTimeoutQueue()
+    {
+        foreach (object packet in _craftingGridCurrentPackets)
+        {
+            capi.Network.SendPacketClient(packet);
+        }
+        long currentTime = _api.World.ElapsedMilliseconds;
+        _craftingGridLastPacketMs = currentTime;
+        _craftingGridCurrentPackets.Clear();
+    }
+    private void SendInvPacketWithTimeout(object packet)
+    {
+        long currentTime = _api.World.ElapsedMilliseconds;
+        if (currentTime - _craftingGridLastPacketMs < _craftingGridSynchronisationTimeoutMs)
+        {
+            _craftingGridCurrentPackets.Add(packet);
+        }
+        else
+        {
+            capi.Network.SendPacketClient(packet);
+            _craftingGridLastPacketMs = currentTime;
+        }
     }
 
     private void CloseIconPressed()
